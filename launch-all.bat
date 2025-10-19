@@ -14,7 +14,7 @@ if errorlevel 1 (
 )
 
 echo Starting the Time Auction server in a new window...
-start "Time Auction Server" /D "%~dp0" cmd /k npm start
+start "Time Auction Server" cmd /k "cd /d \"%~dp0\" && npm start"
 
 set "TARGET_URL=%TIME_AUCTION_URL%"
 if not defined TARGET_URL set "TARGET_URL=http://localhost:3000/host"
