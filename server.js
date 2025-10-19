@@ -17,6 +17,7 @@ setInterval(()=>{ try{ io.emit('server_now', { now: Date.now() }); }catch(e){} }
 
 
 const PORT = process.env.PORT || 3000;
+const NEXT_ROUND_COUNTDOWN_MS = 3000;
 
 // --------------------------- Helpers ---------------------------
 function now(){ return Date.now(); }
@@ -82,6 +83,11 @@ const state = {
   lockedParticipants: new Set(),
   outThisRound: new Set(),
   participantsThisRound: new Set(),
+  readyForNextSet: new Set(),
+  nextRoundQuorum: { enabled:false, mode:'all', count:0, percent:1 },
+  nextRoundCountdownTimer: null,
+  nextRoundCountdownEndsAt: 0,
+  nextRoundSnapshot: { active:false, readyCount:0, requiredCount:0, eligibleCount:0, countdownEndsAt:0, countdownRemainingMs:0, countdownDurationMs: NEXT_ROUND_COUNTDOWN_MS, nextRoundNumber:1, readyPlayers:[], canForce:false },
   sessionCode: '',
   history: [],
   ui: { showHostScoreboard:false, showPublicScoreboard:false, theme:'default', spotlight:true },
@@ -202,6 +208,25 @@ function emitHostStatus(){
   // attach preview values
   payload.preview = { finalRoundTokens: roundTokenValue(state.settings.totalRounds) };
 
+  const snap = state.nextRoundSnapshot || null;
+  if (snap){
+    payload.nextRound = {
+      active: !!snap.active,
+      readyCount: snap.readyCount || 0,
+      requiredCount: snap.requiredCount || 0,
+      eligibleCount: snap.eligibleCount || 0,
+      countdownEndsAt: snap.countdownEndsAt || 0,
+      countdownRemainingMs: snap.countdownRemainingMs || 0,
+      countdownDurationMs: snap.countdownDurationMs || NEXT_ROUND_COUNTDOWN_MS,
+      nextRoundNumber: snap.nextRoundNumber || Math.min(state.settings.totalRounds, state.currentRound + 1),
+      readyPlayers: Array.isArray(snap.readyPlayers) ? snap.readyPlayers.map(p=>({ id:p.id, name:p.name })) : [],
+      canForce: !!snap.canForce,
+      quorum: { ...(state.nextRoundQuorum || {}) },
+    };
+  } else {
+    payload.nextRound = null;
+  }
+
   if (state.phase === 'active'){
     const rows = Array.from(state.participantsThisRound).map(id=>{
       const p = state.players[id]; if (!p) return null;
@@ -225,6 +250,100 @@ function startActiveTicker(){
 function stopActiveTicker(){
   if (!state.activeTicker) return;
   clearInterval(state.activeTicker); state.activeTicker = null;
+}
+
+// --------------------------- Next Round Readiness ---------------------------
+function cancelNextRoundCountdown(){
+  if (state.nextRoundCountdownTimer){ clearTimeout(state.nextRoundCountdownTimer); state.nextRoundCountdownTimer = null; }
+  state.nextRoundCountdownEndsAt = 0;
+}
+
+function scheduleNextRoundCountdown(){
+  if (state.nextRoundCountdownTimer) return;
+  state.nextRoundCountdownEndsAt = now() + NEXT_ROUND_COUNTDOWN_MS;
+  state.nextRoundCountdownTimer = setTimeout(()=>{
+    state.nextRoundCountdownTimer = null;
+    state.nextRoundCountdownEndsAt = 0;
+    if (!startRoundFlow('auto-ready')){
+      updateNextRoundState({ force:true });
+    }
+  }, NEXT_ROUND_COUNTDOWN_MS);
+}
+
+function updateNextRoundState({ force=false, emitHost=true, emitEvent=true } = {}){
+  const active = !!(state.started && state.phase === 'idle' && state.currentRound < state.settings.totalRounds);
+  const eligible = Object.values(state.players).filter(p=>p.joined && !p.exhausted);
+  const eligibleIds = new Set(eligible.map(p=>p.id));
+  state.readyForNextSet.forEach(id=>{ if (!eligibleIds.has(id)) state.readyForNextSet.delete(id); });
+
+  let requiredCount = active ? eligible.length : 0;
+  const quorum = state.nextRoundQuorum || {};
+  if (active && quorum.enabled){
+    const mode = quorum.mode || 'all';
+    if (mode === 'count'){
+      const count = Math.max(0, Math.floor(Number(quorum.count)||0));
+      requiredCount = Math.min(eligible.length, count || eligible.length);
+    } else if (mode === 'percent'){
+      const pctRaw = Number(quorum.percent);
+      const pct = isNaN(pctRaw) ? 1 : Math.max(0, Math.min(1, pctRaw));
+      requiredCount = Math.min(eligible.length, Math.max(1, Math.ceil(eligible.length * pct)));
+    } else {
+      requiredCount = eligible.length;
+    }
+  }
+
+  const readyCount = state.readyForNextSet.size;
+
+  if (!active || requiredCount === 0 || readyCount < requiredCount){
+    if (state.nextRoundCountdownTimer || state.nextRoundCountdownEndsAt){ cancelNextRoundCountdown(); }
+  } else if (!state.nextRoundCountdownTimer){
+    scheduleNextRoundCountdown();
+  }
+
+  const countdownEndsAt = active ? state.nextRoundCountdownEndsAt : 0;
+  const countdownRemainingMs = countdownEndsAt ? Math.max(0, countdownEndsAt - now()) : 0;
+  const nextRoundNumber = Math.min(state.settings.totalRounds, state.currentRound + 1);
+  const readyPlayers = Array.from(state.readyForNextSet).map(id=>{
+    const p = state.players[id];
+    if (!p) return null;
+    return { id, name: p.name };
+  }).filter(Boolean);
+
+  state.nextRoundSnapshot = {
+    active,
+    readyCount,
+    requiredCount,
+    eligibleCount: eligible.length,
+    countdownEndsAt,
+    countdownRemainingMs,
+    countdownDurationMs: NEXT_ROUND_COUNTDOWN_MS,
+    nextRoundNumber,
+    readyPlayers,
+    canForce: active,
+  };
+
+  if (force || active){
+    if (emitEvent){
+      io.emit('next_round_ready_state', {
+        round: state.currentRound,
+        nextRound: nextRoundNumber,
+        active,
+        readyCount,
+        requiredCount,
+        eligibleCount: eligible.length,
+        countdownEndsAt,
+        countdownRemainingMs,
+        countdownDurationMs: NEXT_ROUND_COUNTDOWN_MS,
+      });
+    }
+    if (emitHost){ emitHostStatus(); }
+  }
+}
+
+function resetNextRoundState({ force=false } = {}){
+  state.readyForNextSet = new Set();
+  cancelNextRoundCountdown();
+  updateNextRoundState({ force });
 }
 
 // --------------------------- Round Flow ---------------------------
@@ -326,7 +445,9 @@ function endRound(reason='ended'){
   state.roundActive = false; state.phase = 'idle'; state.countdownStartTs = 0;
   stopActiveTicker();
   clearInRoundFlags(); resetRoundSets();
-  emitHostStatus(); broadcastLobby(); broadcastPublicScoreboard();
+  state.readyForNextSet = new Set();
+  updateNextRoundState({ force:true });
+  broadcastLobby(); broadcastPublicScoreboard();
 
   if (state.currentRound >= state.settings.totalRounds){
     const eliminated = computeEliminations();
@@ -340,6 +461,24 @@ function endRound(reason='ended'){
     io.emit('game_over', { eliminated, champion, final });
   }
 }
+
+function startRoundFlow(source='host'){
+  if (!state.started) return false;
+  if (state.phase !== 'idle') return false;
+  if (state.currentRound >= state.settings.totalRounds) return false;
+  cancelNextRoundCountdown();
+  state.readyForNextSet = new Set();
+  state.lastActiveHolds = null; // clear previous recap
+  state.currentRound += 1;
+  resetRoundSets();
+  clearInRoundFlags();
+  beginArming();
+  updateNextRoundState({ force:true });
+  if (source === 'auto-ready' && state.hostSocketId){
+    io.to(state.hostSocketId).emit('host_action_ack', { ok:true, action:'auto_start_round', detail:`Round ${state.currentRound} auto-started`, round: state.currentRound, ts: now() });
+  }
+  return true;
+}
 function startGame(totalRounds, timeBankMinutes){
   const timeBankMs = Math.max(0, Math.round(Number(timeBankMinutes) * 60 * 1000));
   Object.values(state.players).forEach(p => {
@@ -351,14 +490,16 @@ function startGame(totalRounds, timeBankMinutes){
   state.settings.timeBankMinutes = Number(timeBankMinutes) || 10;
   state.started = true; state.currentRound = 0; state.roundActive = false; state.phase = 'idle';
   state.sessionCode = genSessionCode(); state.history = []; resetRoundSets(); state.lastActiveHolds = null;
-  emitHostStatus(); broadcastLobby(); broadcastPublicScoreboard();
+  resetNextRoundState({ force:true });
+  broadcastLobby(); broadcastPublicScoreboard();
 }
 function newMatch(){ startGame(state.settings.totalRounds, state.settings.timeBankMinutes); }
 function stopGame(){
   state.started = false; state.currentRound = 0; state.roundActive = false; state.phase = 'idle'; state.countdownStartTs = 0;
   stopActiveTicker();
   clearInRoundFlags(); resetRoundSets(); state.lastActiveHolds = null;
-  emitHostStatus(); broadcastLobby(); broadcastPublicScoreboard();
+  resetNextRoundState({ force:true });
+  broadcastLobby(); broadcastPublicScoreboard();
 }
 
 // --------------------------- Routes ---------------------------
@@ -417,7 +558,7 @@ function rebindPlayerSocket(oldId, newSocket){
   p.id = newId;
   state.players[newId] = p;
   if (p.pin){ state.pinIndex.set(p.pin, newId); }
-  ['requiredPressSet','readyHoldersAll','lockedParticipants','outThisRound','participantsThisRound'].forEach(key=>{
+  ['requiredPressSet','readyHoldersAll','lockedParticipants','outThisRound','participantsThisRound','readyForNextSet'].forEach(key=>{
     const set = state[key];
     if (set.has(oldId)){ set.delete(oldId); set.add(newId); }
   });
@@ -446,10 +587,12 @@ io.on('connection', (socket) => {
       if (s){ s.disconnect(true); } else {
         const p = state.players[playerId]; if (!p) return;
         if (p.inRoundHold){ p.inRoundHold=false; p.holdStartTs=null; }
-        ['readyHoldersAll','requiredPressSet','lockedParticipants','outThisRound','participantsThisRound'].forEach(key=>state[key].delete(playerId));
+        ['readyHoldersAll','requiredPressSet','lockedParticipants','outThisRound','participantsThisRound','readyForNextSet'].forEach(key=>state[key].delete(playerId));
         if (p.pin){ state.pinIndex.delete(p.pin); }
         delete state.players[playerId];
-        emitHostStatus(); broadcastLobby(); broadcastPublicScoreboard();
+        broadcastLobby();
+        updateNextRoundState({ emitHost:false, emitEvent: state.phase==='idle', force: state.phase==='idle' });
+        emitHostStatus(); broadcastPublicScoreboard();
       }
   const kickedName = (state.players[playerId]?.name || 'Player');
   io.to(socket.id).emit('host_action_ack', { ok:true, action:'kick_player', detail:`Kicked: ${kickedName}`, playerId, playerName: kickedName, ts: now() });
@@ -461,13 +604,15 @@ io.on('connection', (socket) => {
         if (!live.has(id)){
           const p = state.players[id];
           if (p){
-            ['readyHoldersAll','requiredPressSet','lockedParticipants','outThisRound','participantsThisRound'].forEach(key=>state[key].delete(id));
+            ['readyHoldersAll','requiredPressSet','lockedParticipants','outThisRound','participantsThisRound','readyForNextSet'].forEach(key=>state[key].delete(id));
             if (p.pin) state.pinIndex.delete(p.pin);
             delete state.players[id];
           }
         }
       }
-      emitHostStatus(); broadcastLobby(); broadcastPublicScoreboard();
+      broadcastLobby();
+      updateNextRoundState({ emitHost:false, emitEvent: state.phase==='idle', force: state.phase==='idle' });
+      emitHostStatus(); broadcastPublicScoreboard();
   io.to(socket.id).emit('host_action_ack', { ok:true, action:'clean_ghosts', detail:'Ghosts cleared', ts: now() });
 });
 
@@ -523,14 +668,9 @@ io.on('connection', (socket) => {
     socket.on('host_stop_game', () => { stopGame(); io.to(socket.id).emit('host_action_ack', { ok:true, action:'stop_game', detail:'Game stopped', ts: now() }); });
     socket.on('host_new_match', () => { newMatch(); io.to(socket.id).emit('host_action_ack', { ok:true, action:'new_match', detail:'New match', ts: now() }); });
     socket.on('host_start_round', () => {
-      if (!state.started) return;
-      if (state.phase!=='idle') return;
-      if (state.currentRound >= state.settings.totalRounds) return;
-      state.lastActiveHolds = null; // clear previous recap
-      state.currentRound += 1;
-      state.roundHolds = {};
-      clearInRoundFlags();
-      beginArming(); io.to(socket.id).emit('host_action_ack', { ok:true, action:'start_round', detail:`Round ${state.currentRound} starting`, round: state.currentRound, ts: now() });
+      if (startRoundFlow('host')){
+        io.to(socket.id).emit('host_action_ack', { ok:true, action:'start_round', detail:`Round ${state.currentRound} starting`, round: state.currentRound, ts: now() });
+      }
     });
     socket.on('host_end_round', () => { if (state.phase!=='idle') { endRound('host'); io.to(socket.id).emit('host_action_ack', { ok:true, action:'end_round', detail:`Round ${state.currentRound} ended`, round: state.currentRound, ts: now() }); } });
     socket.on('disconnect', ()=>{ if (state.hostSocketId === socket.id) state.hostSocketId = null; });
@@ -608,7 +748,9 @@ io.on('connection', (socket) => {
     if (!p.pin){ p.pin = assignPinUnique(); state.pinIndex.set(p.pin, p.id); }
     socket.emit('joined', { id: p.id, name: p.name, tokens: p.tokens, pin: p.pin });
     if (state.phase==='arming'){ /* will join next round */ }
-    broadcastLobby(); emitHostStatus(); broadcastPublicScoreboard();
+    broadcastLobby();
+    updateNextRoundState({ emitHost:false, emitEvent: state.phase==='idle', force: state.phase==='idle' });
+    emitHostStatus(); broadcastPublicScoreboard();
   });
 
   socket.on('player_reconnect', ({ pin })=>{
@@ -626,7 +768,30 @@ io.on('connection', (socket) => {
     moved.joined = true;
     socket.emit('joined', { id: moved.id, name: moved.name, tokens: moved.tokens, pin: moved.pin });
     socket.emit('reconnect_result', { ok:true, name:moved.name, tokens:moved.tokens, pin:moved.pin });
-    emitHostStatus(); broadcastLobby(); broadcastPublicScoreboard();
+    broadcastLobby();
+    updateNextRoundState({ emitHost:false, emitEvent: state.phase==='idle', force: state.phase==='idle' });
+    emitHostStatus(); broadcastPublicScoreboard();
+  });
+
+  socket.on('player_ready_next', ()=>{
+    const p = state.players[socket.id];
+    if (!p || !p.joined) return;
+    if (!state.started) return;
+    if (state.phase !== 'idle') return;
+    if (state.currentRound >= state.settings.totalRounds) return;
+    if (p.exhausted) return;
+    if (!state.readyForNextSet.has(p.id)){
+      state.readyForNextSet.add(p.id);
+      updateNextRoundState();
+    }
+  });
+
+  socket.on('player_unready_next', ()=>{
+    const p = state.players[socket.id];
+    if (!p) return;
+    if (state.readyForNextSet.delete(p.id)){
+      updateNextRoundState();
+    }
   });
 
   socket.on('hold_press', ()=>{
@@ -683,10 +848,12 @@ io.on('connection', (socket) => {
       if ((state.phase==='countdown' || state.phase==='active') && state.lockedParticipants.has(p.id)) state.outThisRound.add(p.id);
     }
 
-    ['readyHoldersAll','requiredPressSet','lockedParticipants','participantsThisRound'].forEach(key=>state[key].delete(p.id));
+    ['readyHoldersAll','requiredPressSet','lockedParticipants','participantsThisRound','readyForNextSet'].forEach(key=>state[key].delete(p.id));
     // keep player record to allow PIN reconnect
 
-    emitHostStatus(); broadcastLobby(); broadcastPublicScoreboard();
+    broadcastLobby();
+    updateNextRoundState({ emitHost:false, emitEvent: state.phase==='idle', force: state.phase==='idle' });
+    emitHostStatus(); broadcastPublicScoreboard();
   });
 });
 

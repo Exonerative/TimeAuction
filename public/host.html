@@ -21,6 +21,10 @@
   #activeHolds{margin-top:10px}
   #activeHolds .bar{height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden}
   #activeHolds .fill{height:6px;background:#10b981}
+  #nextReadyBox{border:1px solid #d1d5db;background:#f9fafb;padding:10px 12px;border-radius:12px}
+  #nextReadyBox .muted{color:#4b5563}
+  #nextReadyCountdown{font-size:12px;margin-top:4px}
+  #nextReadyList{font-size:12px;margin-top:4px}
 
   .toasts{position:fixed;top:12px;right:12px;display:grid;gap:8px;z-index:9999}
   .toast{background:#0f172a;color:#e6f0ff;border:1px solid #1e293b;border-radius:12px;padding:10px 12px;box-shadow:0 6px 30px rgba(0,0,0,.25);max-width:320px}
@@ -70,8 +74,16 @@
       <div id="activeHolds"></div>
 
       <div class="muted" id="armingRow" style="margin-top:6px;display:none">Arming — ready <span id="readyCount">0</span>/<span id="requiredCount">0</span></div>
+      <div id="nextReadyBox" style="margin-top:10px;display:none">
+        <div style="font-weight:600">Next round readiness</div>
+        <div class="muted">Ready <span id="nextReadyCount">0</span>/<span id="nextReadyRequired">0</span></div>
+        <div id="nextReadyCountdown" class="muted"></div>
+        <div id="nextReadyList" class="muted"></div>
+        <div style="margin-top:8px">
+          <button id="startRound" class="btn primary">Force Start Round</button>
+        </div>
+      </div>
       <div style="margin-top:10px">
-        <button id="startRound" class="btn primary">Start Round</button>
         <button id="endRound" class="btn">End Round</button>
       </div>
       <div style="margin-top:14px" id="lastResult"></div>

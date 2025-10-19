@@ -83,6 +83,13 @@
   #winnerBanner .title{font-weight:800}
   #winnerBanner .sub{color:#9aa0a6;font-size:13px;margin-top:4px}
 
+  /* Next round readiness */
+  #nextReadyCard{ display:none; margin-top:14px; border:1px solid #1f2632; border-radius:16px; padding:14px; background:#10131a; }
+  #nextReadyCard h3{ margin:0 0 6px; font-size:16px; }
+  #nextReadyCountdown{ font-size:12px; margin-top:4px; color:#9aa0a6; }
+  #nextReadyStatus{ font-size:12px; margin-top:6px; color:#9aa0a6; }
+  #nextReadyBtn{ width:100%; margin-top:10px; }
+
 
   /* Heartbeat pulse */
   @keyframes hbBeat { 0%{transform:scale(1)} 40%{transform:scale(1.03)} 100%{transform:scale(1)} }
@@ -134,6 +141,14 @@
 
       <div id="exhaustedMsg" class="toast" style="display:none">Your time bank is exhausted. You are spectating.</div>
       <div id="roundResult" style="margin-top:10px" class="muted"></div>
+
+      <div id="nextReadyCard">
+        <h3>Next round</h3>
+        <div class="muted">Ready <span id="nextReadyCount">0</span>/<span id="nextReadyRequired">0</span></div>
+        <div id="nextReadyCountdown"></div>
+        <button id="nextReadyBtn" class="btn primary">I'm ready for the next round</button>
+        <div id="nextReadyStatus"></div>
+      </div>
 
       <div id="publicScoreCard" class="card pad">
         <h3>Scoreboard</h3>

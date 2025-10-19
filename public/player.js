@@ -33,6 +33,13 @@
   const publicScoreCard = document.getElementById('publicScoreCard');
   const publicScoreTable = document.getElementById('publicScoreTable');
 
+  const nextReadyCard = document.getElementById('nextReadyCard');
+  const nextReadyCountEl = document.getElementById('nextReadyCount');
+  const nextReadyRequiredEl = document.getElementById('nextReadyRequired');
+  const nextReadyCountdownEl = document.getElementById('nextReadyCountdown');
+  const nextReadyBtn = document.getElementById('nextReadyBtn');
+  const nextReadyStatusEl = document.getElementById('nextReadyStatus');
+
   const phaseBadge = document.getElementById('phaseBadge');
   const phaseCopy  = document.getElementById('phaseCopy');
   const roundTimerEl = document.getElementById('roundTimer');
@@ -56,6 +63,8 @@
   const closeFinal = document.getElementById('closeFinal');
 
   let joined=false, inHold=false, exhausted=false, roundActive=false, releasedOut=false, disabledUI=false, phase='idle', myId=null;
+  let readyForNext=false, nextReadyActive=false;
+  let nextReadyCountdownTs=0, nextReadyTicker=null, nextReadyRound=0;
   let activeStart=0, activationTs=0, timerInt=null;
 
   // Heartbeat ramp config + loop
@@ -128,10 +137,69 @@
   }
   function stopTimer(){ if (!timerInt) return; clearInterval(timerInt); timerInt=null; roundTimerEl.textContent = '00:00.000'; }
 
+  function drawNextReadyCountdown(){
+    if (!nextReadyCountdownEl) return;
+    if (!nextReadyCountdownTs){ nextReadyCountdownEl.textContent = 'Waiting for players…'; return; }
+    const remain = Math.max(0, nextReadyCountdownTs - serverNow());
+    if (remain <= 0){ nextReadyCountdownEl.textContent = 'Starting…'; return; }
+    nextReadyCountdownEl.textContent = 'Auto-start in ' + (remain/1000).toFixed(1) + 's';
+  }
+  function ensureNextReadyTicker(active){
+    if (active){
+      if (nextReadyTicker) return;
+      nextReadyTicker = setInterval(()=>{ if (nextReadyCountdownTs){ drawNextReadyCountdown(); } }, 100);
+    } else if (nextReadyTicker){
+      clearInterval(nextReadyTicker); nextReadyTicker=null;
+    }
+  }
+  function updateNextReadyButton(){
+    if (!nextReadyBtn || !nextReadyStatusEl) return;
+    const roundLabel = nextReadyRound ? `Round ${nextReadyRound}` : 'the next round';
+    if (!joined || !nextReadyActive){
+      nextReadyBtn.disabled = true;
+      nextReadyBtn.textContent = 'I\'m ready for the next round';
+      nextReadyStatusEl.textContent = exhausted ? 'You are exhausted.' : 'Waiting for the host…';
+      return;
+    }
+    const canInteract = !exhausted;
+    nextReadyBtn.disabled = !canInteract;
+    nextReadyBtn.textContent = readyForNext ? 'Ready! Tap to cancel' : 'I\'m ready for the next round';
+    if (exhausted){
+      nextReadyStatusEl.textContent = 'You are exhausted and cannot join ' + roundLabel + '.';
+    } else if (readyForNext){
+      nextReadyStatusEl.textContent = 'You are ready for ' + roundLabel + '.';
+    } else {
+      nextReadyStatusEl.textContent = 'Tap when you\'re ready for ' + roundLabel + '.';
+    }
+  }
+  function resetNextReadyState(){
+    readyForNext = false;
+    nextReadyActive = false;
+    nextReadyCountdownTs = 0;
+    nextReadyRound = 0;
+    ensureNextReadyTicker(false);
+    if (nextReadyCard) nextReadyCard.style.display = 'none';
+    drawNextReadyCountdown();
+    updateNextReadyButton();
+  }
+
   function startHold(){ if (!joined || disabledUI) return; if (exhausted && phase==='active') return; if (phase==='idle') return; if (phase==='countdown' || phase==='active'){ if (releasedOut) return; } inHold = true; socket.emit('hold_press'); updateHoldVisual(); }
   function endHold(){ if (!inHold) return; inHold=false; socket.emit('hold_release'); if (phase==='countdown' || phase==='active'){ releasedOut=true; disabledUI=true; } updateHoldVisual(); }
 
   // events
+  if (nextReadyBtn){
+    nextReadyBtn.addEventListener('click', ()=>{
+      if (!joined || !nextReadyActive || exhausted) return;
+      if (readyForNext){
+        readyForNext = false;
+        socket.emit('player_unready_next');
+      } else {
+        readyForNext = true;
+        socket.emit('player_ready_next');
+      }
+      updateNextReadyButton();
+    });
+  }
   joinBtn.onclick = ()=>{ const name = nameInput.value.trim().slice(0,24) || 'Player'; socket.emit('player_join', { name }); };
   reconnectBtn.onclick = ()=>{ const pin = pinInput.value.trim(); if (!pin) return alert('Enter your PIN'); socket.emit('player_reconnect', { pin }); };
   document.addEventListener('contextmenu', e=>e.preventDefault());
@@ -147,7 +215,7 @@
     myPinEl.textContent = d.pin || '';
     joinCard.style.display='none'; gameCard.style.display='block';
     askNotifyPermission();
-    setPhaseUI('idle'); updateHoldVisual(); stopTimer(); cancelHeartbeat();
+    setPhaseUI('idle'); updateHoldVisual(); stopTimer(); cancelHeartbeat(); resetNextReadyState();
   });
   socket.on('reconnect_result', (r)=>{
     if (!r.ok){ alert(r.error || 'Reconnect failed'); return; }
@@ -156,7 +224,7 @@
 
   socket.on('lobby_update', (l)=>{ if (!joined) return; const me=(l.lobby||[]).find(p=>p.id===myId); if (me){ tokenCount.textContent='🏆 '+me.tokens; } });
 
-  socket.on('arming_started', ()=>{ if (exhausted){ disabledUI=false; try{ phaseCopy.textContent='Bank exhausted — press & hold to arm the next round (you can’t play).'; }catch(e){} } setPhaseUI('arming'); roundActive=false; releasedOut=false; disabledUI=false; updateHoldVisual(); stopTimer(); cancelHeartbeat(); notify('Round starting','Press & hold now — all players must hold.'); });
+  socket.on('arming_started', ()=>{ if (exhausted){ disabledUI=false; try{ phaseCopy.textContent='Bank exhausted — press & hold to arm the next round (you can’t play).'; }catch(e){} } setPhaseUI('arming'); roundActive=false; releasedOut=false; disabledUI=false; updateHoldVisual(); stopTimer(); cancelHeartbeat(); ensureNextReadyTicker(false); nextReadyCountdownTs=0; readyForNext=false; nextReadyActive=false; if (nextReadyCard) nextReadyCard.style.display='none'; notify('Round starting','Press & hold now — all players must hold.'); });
 
   // Countdown 3,2,1,0 with unified activationTs
   let cdTimer = null;
@@ -193,6 +261,7 @@
 
   socket.on('game_over', (d)=>{
     setPhaseUI('ended');
+    resetNextReadyState();
     // Winner banner
     if (d.champion){ finalChampion.textContent = 'Champion: '+d.champion.name+' ('+d.champion.tokens+')'; }
     else { finalChampion.textContent = 'Champion: —'; }
@@ -219,7 +288,29 @@
   });
   closeFinal.onclick = ()=>{ finalModal.style.display='none'; };
 
-  socket.on('exhausted', ()=>{ setPhaseUI('exhausted'); exhausted=true; inHold=false; disabledUI=true; updateHoldVisual(); vibrate(80); exhaustedMsg.style.display='block'; setTimeout(()=>exhaustedMsg.style.display='none', 2500); });
+  socket.on('exhausted', ()=>{ setPhaseUI('exhausted'); exhausted=true; inHold=false; disabledUI=true; readyForNext=false; updateHoldVisual(); updateNextReadyButton(); vibrate(80); exhaustedMsg.style.display='block'; setTimeout(()=>exhaustedMsg.style.display='none', 2500); });
+
+  socket.on('next_round_ready_state', (d)=>{
+    if (!joined) return;
+    nextReadyRound = d && d.nextRound ? d.nextRound : 0;
+    const active = !!(d && d.active);
+    if (active){
+      nextReadyActive = true;
+      if (nextReadyCard) nextReadyCard.style.display = 'block';
+      if (nextReadyCountEl) nextReadyCountEl.textContent = d.readyCount || 0;
+      if (nextReadyRequiredEl) nextReadyRequiredEl.textContent = d.requiredCount || 0;
+      nextReadyCountdownTs = d.countdownEndsAt || 0;
+      drawNextReadyCountdown();
+      ensureNextReadyTicker(!!nextReadyCountdownTs);
+    } else {
+      nextReadyActive = false;
+      readyForNext = false;
+      nextReadyCountdownTs = 0;
+      ensureNextReadyTicker(false);
+      if (nextReadyCard) nextReadyCard.style.display = 'none';
+    }
+    updateNextReadyButton();
+  });
 
   // Public scoreboard (sorted, includes rank #; no bank shown during play)
   socket.on('scoreboard_update', (d)=>{
@@ -254,6 +345,7 @@
   });
 
   socket.on('game_started', (d)=>{
+    resetNextReadyState();
     const txt = (d && d.rulesText) ? String(d.rulesText).replace(/\n/g, ' \u2022 ') : 'Game started';
     showBanner('Game Started', txt, 4000);
   });

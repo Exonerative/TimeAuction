@@ -18,6 +18,11 @@
   const readyCountEl = document.getElementById('readyCount');
   const requiredCountEl = document.getElementById('requiredCount');
   const lastResultEl = document.getElementById('lastResult');
+  const nextReadyBox = document.getElementById('nextReadyBox');
+  const nextReadyCountEl = document.getElementById('nextReadyCount');
+  const nextReadyRequiredEl = document.getElementById('nextReadyRequired');
+  const nextReadyCountdownEl = document.getElementById('nextReadyCountdown');
+  const nextReadyListEl = document.getElementById('nextReadyList');
   const hostScoreTable = document.getElementById('hostScoreTable');
   const activeHoldsEl = document.getElementById('activeHolds');
   const historyMiniEl = document.getElementById('historyMini');
@@ -66,8 +71,27 @@
   };
   document.getElementById('stopGame').onclick = ()=> socket.emit('host_stop_game');
   document.getElementById('newMatch').onclick = ()=> socket.emit('host_new_match');
-  document.getElementById('startRound').onclick = ()=> socket.emit('host_start_round');
+  const startRoundBtn = document.getElementById('startRound');
+  startRoundBtn.onclick = ()=> socket.emit('host_start_round');
   document.getElementById('endRound').onclick = ()=> socket.emit('host_end_round');
+
+  let nextReadyCountdownTs = 0;
+  let nextReadyTicker = null;
+  function drawNextReadyCountdown(){
+    if (!nextReadyCountdownEl) return;
+    if (!nextReadyCountdownTs){ nextReadyCountdownEl.textContent = 'Waiting for players…'; return; }
+    const remain = Math.max(0, nextReadyCountdownTs - serverNow());
+    if (remain <= 0){ nextReadyCountdownEl.textContent = 'Auto-starting…'; return; }
+    nextReadyCountdownEl.textContent = 'Auto-start in ' + (remain/1000).toFixed(1) + 's';
+  }
+  function ensureNextReadyTicker(active){
+    if (active){
+      if (nextReadyTicker) return;
+      nextReadyTicker = setInterval(()=>{ if (nextReadyCountdownTs){ drawNextReadyCountdown(); } }, 80);
+    } else if (nextReadyTicker){
+      clearInterval(nextReadyTicker); nextReadyTicker = null;
+    }
+  }
 
   let activeStart = 0; let roundActive = false; let timerInt = null;
   function fmt(ms){ const m=Math.floor(ms/60000), s=Math.floor((ms%60000)/1000), x=ms%1000; return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+'.'+String(x).padStart(3,'0'); }
@@ -123,6 +147,25 @@
     });
 
     if (s.phase === 'arming' && s.arming){ armingRow.style.display='block'; readyCountEl.textContent = s.arming.readyCount || 0; requiredCountEl.textContent = s.arming.requiredCount || 0; } else { armingRow.style.display='none'; }
+
+    const nr = s.nextRound;
+    if (nr && nr.active){
+      nextReadyBox.style.display = 'block';
+      nextReadyCountEl.textContent = nr.readyCount || 0;
+      nextReadyRequiredEl.textContent = nr.requiredCount || 0;
+      nextReadyCountdownTs = nr.countdownEndsAt || 0;
+      drawNextReadyCountdown();
+      ensureNextReadyTicker(!!nextReadyCountdownTs);
+      const readyNames = (nr.readyPlayers||[]).map(p=>p.name).filter(Boolean);
+      nextReadyListEl.textContent = readyNames.length ? 'Ready: ' + readyNames.join(', ') : '';
+      startRoundBtn.disabled = !(nr.canForce);
+    } else {
+      nextReadyBox.style.display = 'none';
+      nextReadyCountdownTs = 0;
+      ensureNextReadyTicker(false);
+      nextReadyListEl.textContent = '';
+      startRoundBtn.disabled = !(s.started && s.phase === 'idle' && s.currentRound < s.settings.totalRounds);
+    }
 
     const hrows = (s.history||[]).map(h=>'<tr><td>#'+h.round+'</td><td>'+(h.winnerName || '—')+'</td><td>'+fmt(h.winnerMs)+'</td><td>🏆 '+(h.winnerTokens||0)+'</td></tr>').join('');
     historyMiniEl.innerHTML = '<table><thead><tr><th>Round</th><th>Winner</th><th>Held</th><th>Winner 🏆</th></tr></thead><tbody>'+ (hrows || '<tr><td colspan=4 class="muted">No rounds yet</td></tr>') +'</tbody></table>';
