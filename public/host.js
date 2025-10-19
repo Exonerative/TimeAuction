@@ -7,6 +7,7 @@
       window.__getServerNow = ()=> Date.now() + offset;
     }catch(e){}
   });
+  socket.on('final_boost_changed', ()=>{ /* request latest status via host_status stream */ });
 
   const serverNow = ()=> (window.__getServerNow ? window.__getServerNow() : Date.now());
   const lobbyEl = document.getElementById('lobby');
@@ -23,6 +24,31 @@
   const historyMiniEl = document.getElementById('historyMini');
   const fStatusChip = document.getElementById('fStatusChip');
   const fPreview = document.getElementById('fPreview');
+  const toastsEl = document.getElementById('toasts');
+  const openPresentationBtn = document.getElementById('openPresentation');
+  let cachedSessionCode = '';
+
+  function showToast(message, type = 'error'){
+    if (!toastsEl){ console.warn(message); return; }
+    const el = document.createElement('div');
+    el.className = 'toast' + (type ? ' ' + type : '');
+    el.textContent = message;
+    toastsEl.appendChild(el);
+    setTimeout(()=>{ el.remove(); }, 4000);
+  }
+
+  if (openPresentationBtn){
+    openPresentationBtn.disabled = true;
+    openPresentationBtn.addEventListener('click', ()=>{
+      if (!cachedSessionCode){ return; }
+      const popup = window.open(`/presentation?session=${encodeURIComponent(cachedSessionCode||'')}`, '_blank', 'noopener');
+      if (!popup || popup.closed || typeof popup.closed === 'undefined'){
+        showToast('Pop-up blocked. Allow pop-ups to open the presentation.');
+      } else if (typeof popup.focus === 'function') {
+        popup.focus();
+      }
+    });
+  }
   function renderFinalBoostStatus(s){
     try{
       const fb = s.settings?.finalBoost || {enabled:false};
@@ -112,6 +138,9 @@
     roundActive = s.roundActive; phaseEl.textContent = s.phase;
     if (roundActive){ activeStart = serverNow() - s.roundElapsedMs; if (window.__syncClock) window.__syncClock(); ensureTimer(); } else { roundTimerEl.textContent = '00:00.000'; }
 
+    cachedSessionCode = typeof (s.session && s.session.code) === 'string' ? s.session.code : '';
+    if (openPresentationBtn){ openPresentationBtn.disabled = !cachedSessionCode; }
+
     const rows = (s.lobby||[]).map(p=>'<tr data-id="'+p.id+'"><td>'+p.name+(p.exhausted? ' <span class="muted">(exh)</span>':'')+'</td><td>'+p.pin+'</td><td>🏆 '+p.tokens+'</td><td class="actions"><button class="btn" data-act="rename">✎</button><button class="btn" data-act="kick">🗑</button></td></tr>').join('');
     lobbyEl.innerHTML = '<table><thead><tr><th>Player</th><th>PIN</th><th>Tokens 🏆</th><th>Actions</th></tr></thead><tbody>'+rows+'</tbody></table>';
     lobbyEl.querySelectorAll('button[data-act]').forEach(btn=>{
@@ -135,5 +164,3 @@
     else { activeHoldsEl.innerHTML = ''; }
   });
 })();
-  
-  socket.on('final_boost_changed', ()=>{ /* request latest status via host_status stream */ });
