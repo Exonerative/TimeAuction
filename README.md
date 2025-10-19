@@ -73,3 +73,7 @@ npm run launch
 ```
 
 Set `TIME_AUCTION_URL` if you want the browser to open a different base URL (defaults to `http://localhost:3000`).
+
+On Windows, you can also double-click `launch-all.bat` (or run it from a Command Prompt) to accomplish the same workflow. The
+batch file installs dependencies if needed, launches the server in a new window, and opens the host dashboard in your default
+browser. Set `TIME_AUCTION_URL` beforehand to override the default browser URL.
