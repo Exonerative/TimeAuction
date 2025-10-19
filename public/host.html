@@ -6,10 +6,14 @@
   body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:20px;}
   .row{display:flex;gap:20px;flex-wrap:wrap}
   .card{border:1px solid #ddd;border-radius:14px;padding:16px;box-shadow:0 4px 14px rgba(0,0,0,.06)}
+  .card.share-card{display:grid;gap:14px;align-content:start;padding:20px}
   .btn{padding:10px 14px;border-radius:10px;border:1px solid #999;background:#fafafa;cursor:pointer}
   .btn.primary{background:#1a73e8;border-color:#1a73e8;color:#fff}
   .btn.danger{background:#c62828;border-color:#c62828;color:#fff}
   .btn.ghost{background:#fff;border-color:#ddd}
+  .btn.tv{background:#111827;color:#fff;border-color:#111827;font-weight:600;box-shadow:0 6px 22px rgba(15,23,42,.24)}
+  .btn.tv::before{content:"📺";margin-right:6px}
+  .btn.tv:focus-visible{outline:3px solid rgba(59,130,246,.9);outline-offset:2px}
   .big{font-size:24px;font-weight:700}
   .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
   table{border-collapse:collapse;width:100%}
@@ -21,6 +25,18 @@
   #activeHolds{margin-top:10px}
   #activeHolds .bar{height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden}
   #activeHolds .fill{height:6px;background:#10b981}
+
+  .card.share-card h3{font-size:28px;margin:0}
+  .card.share-card img{margin:0 auto;border:1px solid #ddd;border-radius:12px}
+  .card.share-card #joinUrl{margin:0;background:#f3f4f6;padding:8px 10px;border-radius:8px;word-break:break-all;font-size:15px}
+  .share-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+  .share-actions .btn{display:inline-flex;align-items:center;justify-content:center;flex:1 1 160px}
+
+  @media(max-width:540px){
+    .card.share-card{gap:12px;padding:18px}
+    .card.share-card h3{font-size:24px}
+    .share-actions .btn{flex:1 1 100%}
+  }
 
   .toasts{position:fixed;top:12px;right:12px;display:grid;gap:8px;z-index:9999}
   .toast{background:#0f172a;color:#e6f0ff;border:1px solid #1e293b;border-radius:12px;padding:10px 12px;box-shadow:0 6px 30px rgba(0,0,0,.25);max-width:320px}
@@ -38,13 +54,14 @@
   <h1>Host · Time-Bank Auction</h1>
 
   <div class="row">
-    <div class="card" style="flex:1 1 320px;min-width:320px;">
+    <div class="card share-card" style="flex:1 1 320px;min-width:320px;">
       <h3>Join / Share</h3>
-      <img src="__QR_DATA__" alt="QR" style="width:180px;height:180px;border:1px solid #ddd;border-radius:8px"/>
+      <img src="__QR_DATA__" alt="QR" style="width:180px;height:180px"/>
       <p class="mono" id="joinUrl">__JOIN_URL__</p>
-      <div class="row" style="gap:8px">
+      <div class="share-actions">
         <button id="copyUrl" class="btn">Copy URL</button>
         <button id="cleanGhosts" class="btn">Clean ghosts</button>
+        <button id="presenterLaunch" class="btn tv">Open Presentation View</button>
       </div>
     </div>
 

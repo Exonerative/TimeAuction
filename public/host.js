@@ -23,6 +23,7 @@
   const historyMiniEl = document.getElementById('historyMini');
   const fStatusChip = document.getElementById('fStatusChip');
   const fPreview = document.getElementById('fPreview');
+  const presenterLaunch = document.getElementById('presenterLaunch');
   function renderFinalBoostStatus(s){
     try{
       const fb = s.settings?.finalBoost || {enabled:false};
@@ -42,6 +43,14 @@
 
   document.getElementById('copyUrl').onclick = async ()=>{ try{ await navigator.clipboard.writeText(document.getElementById('joinUrl').textContent.trim()); }catch(e){} };
   document.getElementById('cleanGhosts').onclick = ()=> socket.emit('host_clean_ghosts');
+  if (presenterLaunch){
+    presenterLaunch.addEventListener('click', ()=>{
+      const win = window.open('/presentation', '_blank', 'noopener');
+      if (!win){
+        alert('Please allow pop-ups to open the presentation view.');
+      }
+    });
+  }
 
   const hostScoreToggle = document.getElementById('hostScoreToggle');
   const publicScoreToggle = document.getElementById('publicScoreToggle');
