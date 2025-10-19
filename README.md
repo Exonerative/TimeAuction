@@ -64,3 +64,12 @@ Players interact through a touch-friendly layout focused on the hold mechanic:
 - `package.json` – Metadata and start script.
 
 Enjoy hosting your own local Time Auction sessions!
+## Launching the game
+
+Run the bundled launch script to install dependencies, start the server, and open the game in your default browser:
+
+```bash
+npm run launch
+```
+
+Set `TIME_AUCTION_URL` if you want the browser to open a different base URL (defaults to `http://localhost:3000`).
