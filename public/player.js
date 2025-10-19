@@ -38,9 +38,21 @@
   const phaseBadge = document.getElementById('phaseBadge');
   const phaseCopy  = document.getElementById('phaseCopy');
   const roundTimerEl = document.getElementById('roundTimer');
-  const winnerBanner = document.getElementById('winnerBanner');
-  const wbTitle = document.getElementById('wbTitle');
-  const wbSub = document.getElementById('wbSub');
+  const roundRecapPanel = document.getElementById('roundRecapPanel');
+  const roundRecapTitle = document.getElementById('roundRecapTitle');
+  const roundRecapSubtitle = document.getElementById('roundRecapSubtitle');
+  const roundRecapSummary = document.getElementById('roundRecapSummary');
+  const roundRecapLeader = document.getElementById('roundRecapLeader');
+  const roundRecapLeaderNote = document.getElementById('roundRecapLeaderNote');
+  const roundRecapGap = document.getElementById('roundRecapGap');
+  const roundRecapGapNote = document.getElementById('roundRecapGapNote');
+  const roundRecapBonusStat = document.getElementById('roundRecapBonusStat');
+  const roundRecapBonus = document.getElementById('roundRecapBonus');
+  const roundRecapBonusNote = document.getElementById('roundRecapBonusNote');
+  const roundRecapRoundsLeft = document.getElementById('roundRecapRoundsLeft');
+  const roundRecapRoundsLeftNote = document.getElementById('roundRecapRoundsLeftNote');
+  const roundRecapFooterNote = document.getElementById('roundRecapFooterNote');
+  const roundRecapDismiss = document.getElementById('roundRecapDismiss');
   const nextReadyPanel = document.getElementById('nextReadyPanel');
   const nextReadyStatus = document.getElementById('nextReadyStatus');
   const toggleReadyBtn = document.getElementById('toggleReadyBtn');
@@ -170,16 +182,7 @@
     attemptResume('startup');
   }
   const nextReadyCountdownPlayer = document.getElementById('nextReadyCountdownPlayer');
-  function showBanner(title, sub, ms=2600){
-    if (!winnerBanner) return;
-    try{
-      wbTitle.textContent = String(title||'');
-      wbSub.textContent = String(sub||'');
-      winnerBanner.classList.add('show');
-      setTimeout(()=> winnerBanner.classList.remove('show'), Math.max(800, ms));
-    }catch(e){}
-  }
-
+  if (roundRecapDismiss){ roundRecapDismiss.addEventListener('click', ()=> hideRoundRecap(true)); }
 
   const finalModal = document.getElementById('finalModal');
   const finalChampion = document.getElementById('finalChampion');
@@ -191,6 +194,16 @@
   let nextReadyState = { active:false, readyIds:[] };
   let nextReadyTimer = null;
   let nextReadyCountdownCfg = null;
+
+  let latestLobby = { lobby: [], started:false, currentRound:0, totalRounds:0, roundActive:false, phase:'idle' };
+  const latestLobbyById = new Map();
+  const latestLobbyByName = new Map();
+  let myTokensKnown = 0;
+  let roundRecapAutoTimer = null;
+  let roundRecapCloseTimer = null;
+  let inlineAnnouncementTimer = null;
+  let inlineAnnouncementText = null;
+  let inlineAnnouncementPrev = '';
 
   // Heartbeat ramp config + loop
   let hbCfg = { enabled:true, intervalSec:30, multiplier:0.9, minMs:750, maxMs:2000 };
@@ -212,11 +225,280 @@
 
   function stopNextReadyCountdown(){ if (nextReadyTimer){ clearInterval(nextReadyTimer); nextReadyTimer = null; } }
   function drawNextReadyCountdown(){
-    if (!nextReadyCountdownPlayer || !nextReadyCountdownCfg){ if (nextReadyCountdownPlayer) nextReadyCountdownPlayer.style.display='none'; stopNextReadyCountdown(); return; }
+    if (!nextReadyCountdownPlayer || !nextReadyCountdownCfg){
+      if (nextReadyCountdownPlayer){ nextReadyCountdownPlayer.style.display='none'; nextReadyCountdownPlayer.textContent=''; }
+      stopNextReadyCountdown();
+      syncRoundRecapCountdown(null);
+      return;
+    }
     const remain = Math.max(0, (nextReadyCountdownCfg.startTs + nextReadyCountdownCfg.durationMs) - serverNow());
-    nextReadyCountdownPlayer.textContent = 'Auto-start in ' + Math.ceil(remain/1000) + 's';
+    const label = 'Auto-start in ' + Math.ceil(remain/1000) + 's';
+    nextReadyCountdownPlayer.textContent = label;
     nextReadyCountdownPlayer.style.display = 'inline-block';
-    if (remain <= 0){ stopNextReadyCountdown(); }
+    syncRoundRecapCountdown(remain);
+    if (remain <= 0){
+      stopNextReadyCountdown();
+      hideRoundRecap();
+    } else if (roundRecapPanel && roundRecapPanel.classList.contains('show')){
+      const buffer = Math.max(2200, remain + 1200);
+      scheduleRoundRecapAutoHide(buffer);
+    }
+  }
+
+  function clearRoundRecapTimers(){
+    if (roundRecapAutoTimer){ clearTimeout(roundRecapAutoTimer); roundRecapAutoTimer = null; }
+    if (roundRecapCloseTimer){ clearTimeout(roundRecapCloseTimer); roundRecapCloseTimer = null; }
+  }
+  function hideRoundRecap(immediate){
+    if (!roundRecapPanel) return;
+    clearRoundRecapTimers();
+    if (!roundRecapPanel.classList.contains('show')){
+      if (roundRecapFooterNote) roundRecapFooterNote.textContent='';
+      return;
+    }
+    if (immediate){
+      roundRecapPanel.classList.remove('show');
+      roundRecapPanel.classList.remove('closing');
+      if (roundRecapFooterNote) roundRecapFooterNote.textContent='';
+      return;
+    }
+    roundRecapPanel.classList.add('closing');
+    roundRecapCloseTimer = setTimeout(()=>{
+      roundRecapPanel.classList.remove('show');
+      roundRecapPanel.classList.remove('closing');
+      if (roundRecapFooterNote) roundRecapFooterNote.textContent='';
+      roundRecapCloseTimer = null;
+    }, 320);
+  }
+  function scheduleRoundRecapAutoHide(ms){
+    if (roundRecapAutoTimer){ clearTimeout(roundRecapAutoTimer); roundRecapAutoTimer = null; }
+    if (!roundRecapPanel || !roundRecapPanel.classList.contains('show')) return;
+    roundRecapAutoTimer = setTimeout(()=>{ hideRoundRecap(); }, Math.max(1200, ms||0));
+  }
+  function syncRoundRecapCountdown(remainMs){
+    if (!roundRecapFooterNote) return;
+    if (!roundRecapPanel || !roundRecapPanel.classList.contains('show')){
+      roundRecapFooterNote.textContent = '';
+      return;
+    }
+    if (remainMs == null){
+      if (nextReadyCountdownCfg){
+        const calc = Math.max(0, (nextReadyCountdownCfg.startTs + nextReadyCountdownCfg.durationMs) - serverNow());
+        syncRoundRecapCountdown(calc);
+        return;
+      }
+      roundRecapFooterNote.textContent = 'Tap "I\'m ready" when you\'re set.';
+      return;
+    }
+    if (remainMs <= 0){
+      roundRecapFooterNote.textContent = '';
+      return;
+    }
+    roundRecapFooterNote.textContent = 'Auto-start in ' + Math.ceil(remainMs/1000) + 's';
+  }
+
+  function announceInline(title, sub, ms=3200){
+    if (!roundResult) return;
+    const message = [title, sub].filter(Boolean).join(' — ');
+    const showingPrevious = inlineAnnouncementTimer && inlineAnnouncementText && roundResult.textContent === inlineAnnouncementText;
+    if (!showingPrevious){ inlineAnnouncementPrev = roundResult.textContent || ''; }
+    if (inlineAnnouncementTimer){ clearTimeout(inlineAnnouncementTimer); inlineAnnouncementTimer = null; }
+    inlineAnnouncementText = message;
+    roundResult.textContent = message;
+    inlineAnnouncementTimer = setTimeout(()=>{
+      if (roundResult && roundResult.textContent === inlineAnnouncementText){
+        roundResult.textContent = inlineAnnouncementPrev;
+      }
+      inlineAnnouncementTimer = null;
+      inlineAnnouncementText = null;
+    }, Math.max(1500, ms||0));
+  }
+
+  function numberOrNull(val){ const n = Number(val); return Number.isFinite(n) ? n : null; }
+  function formatTokens(val){ const n = numberOrNull(val); if (n == null) return '—'; return n + ' token' + (n === 1 ? '' : 's'); }
+
+  function rebuildLobbySnapshot(payload){
+    const prev = latestLobby || { currentRound:0, totalRounds:0, phase:'idle' };
+    latestLobbyById.clear();
+    latestLobbyByName.clear();
+    const list = (payload && Array.isArray(payload.lobby)) ? payload.lobby : [];
+    const copy = [];
+    for (const item of list){
+      if (!item) continue;
+      const entry = {
+        id: item.id || null,
+        name: item.name || '',
+        tokens: numberOrNull(item.tokens) ?? 0,
+        exhausted: !!item.exhausted,
+      };
+      copy.push(entry);
+      if (entry.id){ latestLobbyById.set(entry.id, entry); }
+      if (entry.name){ latestLobbyByName.set(entry.name, entry); }
+    }
+    latestLobby = {
+      lobby: copy,
+      started: !!(payload && payload.started),
+      currentRound: (payload && typeof payload.currentRound === 'number') ? payload.currentRound : (prev.currentRound || 0),
+      totalRounds: (payload && typeof payload.totalRounds === 'number') ? payload.totalRounds : (prev.totalRounds || 0),
+      roundActive: !!(payload && payload.roundActive),
+      phase: (payload && payload.phase) || prev.phase || 'idle',
+    };
+  }
+
+  function getMyLobbyEntry(){ return myId ? (latestLobbyById.get(myId) || null) : null; }
+
+  function applyRoundResultSnapshot(data){
+    if (!data) return;
+    if (typeof data.round === 'number'){ latestLobby.currentRound = data.round; }
+    if (typeof data.totalRounds === 'number'){ latestLobby.totalRounds = data.totalRounds; }
+    if (typeof data.roundsLeft === 'number'){ latestLobby.roundsLeft = data.roundsLeft; }
+    if (data.winner && typeof data.winnerTokens === 'number'){
+      const winnerEntry = latestLobbyByName.get(data.winner);
+      if (winnerEntry){ winnerEntry.tokens = numberOrNull(data.winnerTokens) ?? winnerEntry.tokens; }
+    }
+    if (data.leaderName && typeof data.leaderTokens === 'number'){
+      const leaderEntry = latestLobbyByName.get(data.leaderName);
+      if (leaderEntry){ leaderEntry.tokens = numberOrNull(data.leaderTokens) ?? leaderEntry.tokens; }
+    }
+  }
+
+  function buildRoundRecapModel(data){
+    const round = (data && typeof data.round === 'number') ? data.round : (latestLobby.currentRound || 0);
+    const totalRounds = (data && typeof data.totalRounds === 'number') ? data.totalRounds : (latestLobby.totalRounds || 0);
+    const fallbackRoundsLeft = typeof latestLobby.roundsLeft === 'number' ? latestLobby.roundsLeft : Math.max(0, Math.max(totalRounds, round) - round);
+    const roundsLeft = (data && typeof data.roundsLeft === 'number') ? data.roundsLeft : fallbackRoundsLeft;
+    const finalRound = !!(data && data.finalRound);
+    const winnerName = data && data.winner ? data.winner : null;
+    const winnerMs = numberOrNull(data && data.winnerMs);
+    const winnerTokens = numberOrNull(data && data.winnerTokens);
+    const leaderName = data && data.leaderName ? data.leaderName : null;
+    const leaderTokens = numberOrNull(data && data.leaderTokens);
+    const bonusValue = numberOrNull(data && data.bonusValue);
+    const myName = playerName ? playerName.textContent : '';
+
+    const meEntry = getMyLobbyEntry();
+    let myTokens = meEntry ? numberOrNull(meEntry.tokens) : null;
+    if (winnerName && myName && winnerName === myName && winnerTokens != null){ myTokens = winnerTokens; }
+    if (myTokens == null && Number.isFinite(myTokensKnown)){ myTokens = myTokensKnown; }
+    if (meEntry && myTokens != null){ meEntry.tokens = myTokens; }
+    if (myTokens != null){ myTokensKnown = myTokens; }
+
+    let leaderDisplayName = leaderName || (leaderTokens != null ? 'Leader' : '—');
+    if (leaderName && myName && leaderName === myName){ leaderDisplayName = 'You'; }
+
+    let leaderValue = leaderDisplayName;
+    let leaderNote = leaderTokens != null ? formatTokens(leaderTokens) : '';
+    const participants = Array.isArray(latestLobby.lobby) ? latestLobby.lobby : [];
+    let tieCount = 0;
+    if (leaderTokens != null){
+      tieCount = participants.filter(p => p && numberOrNull(p.tokens) === leaderTokens).length;
+      if (tieCount === 0 && leaderName){ tieCount = 1; }
+    }
+
+    let gapValue = '—';
+    let gapNote = '';
+    if (leaderTokens != null && myTokens != null){
+      const diff = leaderTokens - myTokens;
+      if (diff === 0){
+        if (tieCount > 1){
+          gapValue = 'Tied for lead';
+          gapNote = tieCount === 2 ? 'Sharing lead with 1 player' : `Sharing lead with ${tieCount-1} players`;
+        } else {
+          gapValue = 'You lead';
+          gapNote = leaderName && leaderName !== myName ? `Ahead of ${leaderName}` : 'Keep the momentum';
+        }
+      } else if (diff > 0){
+        gapValue = `${diff} behind`;
+        const chase = formatTokens(diff);
+        gapNote = leaderName ? `${chase} to catch ${leaderName}` : `Leader ahead by ${chase}`;
+      } else {
+        const ahead = Math.abs(diff);
+        gapValue = `${ahead} ahead`;
+        gapNote = `Up by ${formatTokens(ahead)}`;
+      }
+    } else if (myTokens != null){
+      gapValue = formatTokens(myTokens);
+      gapNote = 'Your total';
+    }
+
+    const roundLabel = round > 0 ? `Round ${round}` : 'Round recap';
+    const title = `${roundLabel}${totalRounds ? ` · ${totalRounds} total` : ''}`;
+    let subtitle;
+    let summary;
+    let fallbackText;
+    if (winnerName){
+      const held = winnerMs != null ? fmt(winnerMs) : '—';
+      subtitle = `Winner: ${winnerName}${winnerTokens != null ? ` · 🏆 ${winnerTokens}` : ''}`;
+      summary = `${winnerName} held for ${held}${bonusValue && bonusValue > 1 ? ` · Bonus ×${bonusValue}` : ''}.`;
+      fallbackText = `${roundLabel}: ${winnerName} held ${held}${winnerTokens != null ? ` · 🏆 ${winnerTokens}` : ''}`;
+    } else {
+      subtitle = 'No winner this round';
+      summary = 'Everyone released or timed out before the finish.';
+      fallbackText = `${roundLabel}: No winner`;
+    }
+    if (finalRound){
+      summary += ' Match complete!';
+      fallbackText += ' · Match complete';
+    }
+
+    let roundsLeftValue = roundsLeft === 0 ? (finalRound ? 'Match complete' : 'Final round') : `${roundsLeft} left`;
+    if (roundsLeft < 0) roundsLeftValue = '—';
+    const roundsLeftNote = totalRounds ? `${round}/${totalRounds} played` : '';
+
+    const bonusActive = bonusValue != null && bonusValue > 1;
+    const bonusDisplay = bonusActive ? `×${bonusValue}` : '—';
+    const bonusNote = bonusActive ? 'Bonus round active' : 'Standard value';
+
+    latestLobby.roundsLeft = roundsLeft;
+
+    return {
+      title,
+      subtitle,
+      summary,
+      leaderValue,
+      leaderNote,
+      gapValue,
+      gapNote,
+      bonusActive,
+      bonusDisplay,
+      bonusNote,
+      roundsLeftValue,
+      roundsLeftNote,
+      fallback: fallbackText,
+      autoHideMs: finalRound ? 9000 : 6500,
+    };
+  }
+
+  function renderRoundRecap(model){
+    if (!roundRecapPanel || !model) return;
+    clearRoundRecapTimers();
+    try{
+      if (roundRecapTitle) roundRecapTitle.textContent = model.title || 'Round recap';
+      if (roundRecapSubtitle) roundRecapSubtitle.textContent = model.subtitle || '';
+      if (roundRecapSummary) roundRecapSummary.textContent = model.summary || '';
+      if (roundRecapLeader) roundRecapLeader.textContent = model.leaderValue || '—';
+      if (roundRecapLeaderNote) roundRecapLeaderNote.textContent = model.leaderNote || '';
+      if (roundRecapGap) roundRecapGap.textContent = model.gapValue || '—';
+      if (roundRecapGapNote) roundRecapGapNote.textContent = model.gapNote || '';
+      if (roundRecapRoundsLeft) roundRecapRoundsLeft.textContent = model.roundsLeftValue || '—';
+      if (roundRecapRoundsLeftNote) roundRecapRoundsLeftNote.textContent = model.roundsLeftNote || '';
+      if (roundRecapBonus){ roundRecapBonus.textContent = model.bonusDisplay || '—'; }
+      if (roundRecapBonusStat){
+        if (model.bonusActive){
+          roundRecapBonusStat.style.display = '';
+          if (roundRecapBonusNote){ roundRecapBonusNote.textContent = model.bonusNote || ''; }
+        } else {
+          roundRecapBonusStat.style.display = 'none';
+          if (roundRecapBonusNote){ roundRecapBonusNote.textContent = ''; }
+        }
+      }
+      roundRecapPanel.classList.remove('closing');
+      roundRecapPanel.classList.add('show');
+      syncRoundRecapCountdown(null);
+      const remain = nextReadyCountdownCfg ? Math.max(0, (nextReadyCountdownCfg.startTs + nextReadyCountdownCfg.durationMs) - serverNow()) : null;
+      const autoHide = remain != null && remain > 0 ? Math.min(model.autoHideMs, Math.max(2200, remain + 1200)) : model.autoHideMs;
+      scheduleRoundRecapAutoHide(autoHide);
+    }catch(e){}
   }
   function updateNextReadyUI(){
     if (!nextReadyPanel || !toggleReadyBtn) return;
@@ -226,6 +508,7 @@
       nextReadyPanel.style.display = 'none';
       if (nextReadyCountdownPlayer){ nextReadyCountdownPlayer.style.display = 'none'; nextReadyCountdownPlayer.textContent=''; }
       stopNextReadyCountdown();
+      syncRoundRecapCountdown(null);
       return;
     }
     nextReadyPanel.style.display = 'block';
@@ -395,6 +678,7 @@
 
   socket.on('joined', (d)=>{
     joined=true; myId=d.id; playerName.textContent=d.name; tokenCount.textContent='🏆 '+d.tokens;
+    myTokensKnown = numberOrNull(d.tokens) ?? 0;
     myPinEl.textContent = d.pin || '';
     if (pinInput){ pinInput.value = d.pin || ''; }
     if (d.sessionToken){
@@ -419,10 +703,13 @@
   });
 
   socket.on('lobby_update', (l)=>{
+    rebuildLobbySnapshot(l || {});
     if (!joined) return;
-    const me=(l.lobby||[]).find(p=>p.id===myId);
+    const me = getMyLobbyEntry();
     if (me){
-      tokenCount.textContent='🏆 '+me.tokens;
+      const tokens = numberOrNull(me.tokens) ?? 0;
+      tokenCount.textContent = '🏆 ' + tokens;
+      myTokensKnown = tokens;
       if (sessionInfo && me.name && sessionInfo.name !== me.name){
         sessionInfo = { pin: sessionInfo.pin, name: me.name, sessionToken: sessionInfo.sessionToken };
         saveSession(sessionInfo);
@@ -438,6 +725,7 @@
 
   socket.on('arming_started', ()=>{
     nextReadyCountdownCfg = null; stopNextReadyCountdown(); if (nextReadyCountdownPlayer) nextReadyCountdownPlayer.style.display='none'; if (nextReadyPanel) nextReadyPanel.style.display='none';
+    hideRoundRecap(true);
     if (exhausted){ disabledUI=false; try{ phaseCopy.textContent='Bank exhausted — press & hold to arm the next round (you can’t play).'; }catch(e){} }
     setPhaseUI('arming'); roundActive=false; releasedOut=false; disabledUI=false; updateHoldVisual(); stopTimer(); cancelHeartbeat(); notify('Round starting','Press & hold now — all players must hold.');
   });
@@ -445,6 +733,7 @@
   // Countdown 3,2,1,0 with unified activationTs
   let cdTimer = null;
   socket.on('countdown_started', (d)=>{
+    hideRoundRecap(true);
     setPhaseUI('countdown'); if (exhausted){ disabledUI=false; try{ phaseCopy.textContent='Countdown — you’re exhausted and won’t play this round.';}catch(e){} } updateHoldVisual();
     activationTs = (d.startTs||serverNow()) + (d.durationMs||0);
     function draw(){
@@ -462,6 +751,7 @@
   });
 
   socket.on('round_started', (d)=>{
+    hideRoundRecap(true);
     const ts = activationTs || (d.startTs + (d.durationMs||0)) || serverNow();
     const delay = Math.max(0, ts - serverNow());
     setTimeout(()=>{
@@ -474,10 +764,58 @@
     }, delay);
   });
 
-  socket.on('round_result', (d)=>{ setPhaseUI('idle'); roundActive=false; inHold=false; releasedOut=false; disabledUI=false; updateHoldVisual(); if (d.winner){ roundResult.textContent = 'Round '+d.round+': '+d.winner+' held '+fmt(d.winnerMs)+' · now at '+d.winnerTokens; if (winnerBanner){ wbTitle.textContent = d.winner + ' wins Round ' + d.round; wbSub.textContent = 'Held ' + fmt(d.winnerMs) + ' · 🏆 ' + d.winnerTokens; winnerBanner.classList.add('show'); setTimeout(()=> winnerBanner.classList.remove('show'), 2600); } } stopTimer(); cancelHeartbeat(); updateNextReadyUI(); });
+  socket.on('bonus_round_armed', (d={})=>{
+    announceInline('Bonus round', 'Winner gets 🏆 ×'+(d.value||2), 3200);
+    if (holdArea){ holdArea.classList.add('bonus'); }
+  });
+
+  socket.on('final_round_armed', (d={})=>{
+    announceInline('Final round', 'Winner gets 🏆 '+(d.tokens||1), 3400);
+  });
+
+  socket.on('game_started', (d={})=>{
+    const txt = (d && d.rulesText) ? String(d.rulesText).replace(/\n/g, ' \u2022 ') : 'Game started';
+    announceInline('Game started', txt, 4000);
+    exhausted = false; disabledUI = false; updateNextReadyUI();
+  });
+
+  socket.on('round_result', (d={})=>{
+    setPhaseUI('idle');
+    roundActive=false; inHold=false; releasedOut=false; disabledUI=false;
+    updateHoldVisual();
+    if (holdArea){ holdArea.classList.remove('bonus'); }
+
+    applyRoundResultSnapshot(d);
+    const recapModel = buildRoundRecapModel(d);
+    let fallback = recapModel && recapModel.fallback ? recapModel.fallback : 'Round recap unavailable.';
+    if (!recapModel){
+      const roundLabel = (d && typeof d.round === 'number') ? `Round ${d.round}` : 'Round';
+      if (d && d.winner){
+        const held = (d && typeof d.winnerMs === 'number') ? fmt(d.winnerMs) : '—';
+        const tokensStr = (d && d.winnerTokens!=null) ? ` · 🏆 ${d.winnerTokens}` : '';
+        fallback = `${roundLabel}: ${d.winner} held ${held}${tokensStr}`;
+      } else {
+        fallback = `${roundLabel}: No winner`;
+      }
+    }
+    if (roundResult) roundResult.textContent = fallback;
+
+    if (recapModel){ renderRoundRecap(recapModel); } else { hideRoundRecap(true); }
+
+    let latestTokens = numberOrNull(myTokensKnown);
+    if (latestTokens == null){
+      const me = getMyLobbyEntry();
+      if (me){ latestTokens = numberOrNull(me.tokens); }
+    }
+    if (latestTokens != null){ tokenCount.textContent = '🏆 ' + latestTokens; }
+
+    stopTimer(); cancelHeartbeat();
+    updateNextReadyUI();
+  });
 
   socket.on('game_over', (d)=>{
     nextReadyCountdownCfg = null; stopNextReadyCountdown(); if (nextReadyPanel) nextReadyPanel.style.display='none'; if (nextReadyCountdownPlayer) nextReadyCountdownPlayer.style.display='none';
+    hideRoundRecap(true);
     setPhaseUI('ended');
     // Winner banner
     if (d.champion){ finalChampion.textContent = 'Champion: '+d.champion.name+' ('+d.champion.tokens+')'; }
@@ -531,16 +869,3 @@
   // Initialize UI
   setPhaseUI('idle'); stopTimer(); cancelHeartbeat();
 })();
-  socket.on('bonus_round_armed', (d)=>{
-    showBanner('BONUS ROUND', 'Winner gets 🏆 ×'+(d.value||2), 3200);
-    holdArea.classList.add('bonus');
-  });
-  socket.on('final_round_armed', (d)=>{
-    showBanner('FINAL ROUND', 'Winner gets 🏆 '+(d.tokens||1), 3400);
-  });
-
-  socket.on('game_started', (d)=>{
-    const txt = (d && d.rulesText) ? String(d.rulesText).replace(/\n/g, ' \u2022 ') : 'Game started';
-    showBanner('Game Started', txt, 4000);
-    exhausted = false; disabledUI = false; updateNextReadyUI();
-  });

@@ -90,6 +90,7 @@ const state = {
   hostSocketId: null,
   activeTicker: null,
   lastActiveHolds: null, // recap of last round
+  currentRoundBonus: null,
   nextRound: { requirement: 0, countdownMs: 3000, countdownStartTs: 0, countdownTimer: null },
 };
 
@@ -389,6 +390,7 @@ function stopActiveTicker(){
 // --------------------------- Round Flow ---------------------------
 function beginArming(){
   state.phase = 'arming'; state.roundActive = false; state.countdownStartTs = 0;
+  state.currentRoundBonus = null;
   state.readyHoldersAll = new Set(); state.lockedParticipants = new Set(); state.outThisRound = new Set();
   state.requiredPressSet = new Set(Object.values(state.players).filter(p=>p.joined).map(p=>p.id));
   state.readyForNextSet = new Set();
@@ -446,6 +448,7 @@ function beginActive(){
     }
   });
   const _bonusRS = isBonusRound(state.settings, state.currentRound);
+  state.currentRoundBonus = { active: !!_bonusRS?.active, value: _bonusRS?.value || 1 };
   io.emit('round_started', { round: state.currentRound, startTs: state.roundStartTs, elapsedMs: 0, bonusActive: !!_bonusRS.active, bonusValue: _bonusRS.value });
   startActiveTicker();
   emitHostStatus(); broadcastPublicScoreboard();
@@ -479,17 +482,36 @@ function endRound(reason='ended'){
   }
   let winnerId = null, winnerMs = 0;
   for (const [pid, held] of Object.entries(state.roundHolds)){ if ((held||0) > winnerMs){ winnerMs = held; winnerId = pid; } }
+  let resultPayload;
+  let historyEntry;
   if (winnerId && state.players[winnerId]){
     const w = state.players[winnerId];
     w.tokens += roundTokenValue(state.currentRound);
     w.lastVictoryRound = state.currentRound;
-    io.emit('round_result', { round: state.currentRound, winner: w.name, winnerMs, winnerTokens: w.tokens, finalRound: (state.currentRound === state.settings.totalRounds) });
-    state.history.push({ round: state.currentRound, winnerId, winnerName: w.name, winnerMs, winnerTokens: w.tokens, ts: now() });
+    resultPayload = { round: state.currentRound, winner: w.name, winnerMs, winnerTokens: w.tokens, finalRound: (state.currentRound === state.settings.totalRounds) };
+    historyEntry = { round: state.currentRound, winnerId, winnerName: w.name, winnerMs, winnerTokens: w.tokens, ts: now() };
   } else {
-    io.emit('round_result', { round: state.currentRound, winner: null, winnerMs: 0, winnerTokens: 0, finalRound: (state.currentRound === state.settings.totalRounds) });
-    state.history.push({ round: state.currentRound, winnerId: null, winnerName: null, winnerMs: 0, winnerTokens: 0, ts: now() });
+    resultPayload = { round: state.currentRound, winner: null, winnerMs: 0, winnerTokens: 0, finalRound: (state.currentRound === state.settings.totalRounds) };
+    historyEntry = { round: state.currentRound, winnerId: null, winnerName: null, winnerMs: 0, winnerTokens: 0, ts: now() };
   }
+
+  const totalRounds = state.settings.totalRounds;
+  const roundsLeft = Math.max(0, totalRounds - state.currentRound);
+  const bonusMeta = state.currentRoundBonus || { active:false, value:1 };
+  const scoreboard = buildHostScoreboard();
+  const leaderRow = scoreboard.length ? scoreboard[0] : null;
+
+  resultPayload.totalRounds = totalRounds;
+  resultPayload.roundsLeft = roundsLeft;
+  resultPayload.leaderName = leaderRow ? leaderRow.name : null;
+  resultPayload.leaderTokens = leaderRow ? leaderRow.tokens : null;
+  if (bonusMeta.active){ resultPayload.bonusValue = bonusMeta.value; }
+
+  io.emit('round_result', resultPayload);
+  state.history.push(historyEntry);
   if (state.history.length > 500) state.history.splice(0, state.history.length - 500);
+
+  state.currentRoundBonus = null;
 
   // Build recap snapshot before clearing
   const recapRows = Array.from(state.participantsThisRound || []).map(id=>{
@@ -532,6 +554,7 @@ function startGame(totalRounds, timeBankMinutes){
   state.settings.timeBankMinutes = Number(timeBankMinutes) || 10;
   state.started = true; state.currentRound = 0; state.roundActive = false; state.phase = 'idle';
   state.sessionCode = genSessionCode(); state.history = []; resetRoundSets(); state.lastActiveHolds = null;
+  state.currentRoundBonus = null;
   cancelNextRoundCountdown();
   state.readyForNextSet = new Set();
   state.nextRound.requirement = 0;
@@ -543,6 +566,7 @@ function stopGame(){
   state.started = false; state.currentRound = 0; state.roundActive = false; state.phase = 'idle'; state.countdownStartTs = 0;
   stopActiveTicker();
   clearInRoundFlags(); resetRoundSets(); state.lastActiveHolds = null;
+  state.currentRoundBonus = null;
   cancelNextRoundCountdown();
   state.readyForNextSet = new Set();
   state.nextRound.requirement = 0;
