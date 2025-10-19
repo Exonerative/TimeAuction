@@ -18,8 +18,6 @@
   const nameInput = document.getElementById('name');
   const pinInput = document.getElementById('pin');
   const myPinEl = document.getElementById('myPin');
-  const savedSessionEl = document.getElementById('savedSession');
-  const statusMsg = document.getElementById('statusMsg');
 
   const playerName = document.getElementById('playerName');
   const tokenCount = document.getElementById('tokenCount');
@@ -44,125 +42,6 @@
   const nextReadyPanel = document.getElementById('nextReadyPanel');
   const nextReadyStatus = document.getElementById('nextReadyStatus');
   const toggleReadyBtn = document.getElementById('toggleReadyBtn');
-
-  const STORAGE_KEY = 'ta_player_session_v1';
-  const BROADCAST_FALLBACK_KEY = '__ta_player_signal';
-  const TAB_ID = Math.random().toString(36).slice(2);
-  let sessionInfo = loadSession();
-  let shouldAutoResume = !!(sessionInfo && !document.hidden);
-  let manualDisconnect = false;
-  let resumeInFlight = false;
-  let pendingResumeReason = null;
-
-  function loadSession(){
-    try{
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed || !parsed.pin || !parsed.sessionToken) return null;
-      return parsed;
-    }catch(e){ return null; }
-  }
-  function saveSession(info){
-    try{
-      if (!info){ localStorage.removeItem(STORAGE_KEY); }
-      else { localStorage.setItem(STORAGE_KEY, JSON.stringify(info)); }
-    }catch(e){}
-  }
-  function clearStoredSession(){ sessionInfo = null; saveSession(null); updateSavedSessionUI(); }
-  function updateSavedSessionUI(){
-    if (!savedSessionEl) return;
-    if (sessionInfo && sessionInfo.pin){
-      savedSessionEl.style.display = 'block';
-      savedSessionEl.textContent = `Saved PIN ${sessionInfo.pin}${sessionInfo.name ? ` · ${sessionInfo.name}` : ''}`;
-      if (pinInput){ pinInput.value = sessionInfo.pin; }
-      if (nameInput && !nameInput.value && sessionInfo.name){ nameInput.value = sessionInfo.name; }
-      if (reconnectBtn){ reconnectBtn.disabled = false; }
-    } else {
-      savedSessionEl.style.display = 'none';
-      if (reconnectBtn){ reconnectBtn.disabled = false; }
-    }
-  }
-  function setStatus(text){
-    if (!statusMsg) return;
-    if (!text){ statusMsg.style.display='none'; statusMsg.textContent=''; }
-    else { statusMsg.style.display='block'; statusMsg.textContent = text; }
-  }
-
-  let bc = null;
-  try{ if ('BroadcastChannel' in window){ bc = new BroadcastChannel('ta-player-session'); } }catch(e){ bc=null; }
-  function handleSignal(data){
-    if (!data || data.tabId === TAB_ID) return;
-    if (data.type === 'claim'){
-      if (sessionInfo && shouldAutoResume){
-        pauseSession();
-        setStatus('Paused — another tab is now active.');
-      }
-    }
-  }
-  if (bc){ bc.onmessage = (event)=>{ handleSignal(event.data); }; }
-  else {
-    window.addEventListener('storage', (ev)=>{
-      if (ev.key !== BROADCAST_FALLBACK_KEY || !ev.newValue) return;
-      try{ const data = JSON.parse(ev.newValue); handleSignal(data); }catch(e){}
-    });
-  }
-  function sendSignal(payload){
-    const data = Object.assign({ tabId: TAB_ID, ts: Date.now() }, payload||{});
-    if (bc){ bc.postMessage(data); }
-    else {
-      try{
-        localStorage.setItem(BROADCAST_FALLBACK_KEY, JSON.stringify(data));
-        // Ensure subsequent writes still fire storage events
-        localStorage.removeItem(BROADCAST_FALLBACK_KEY);
-      }catch(e){}
-    }
-  }
-  function broadcastClaim(reason){
-    if (!sessionInfo) return;
-    sendSignal({ type:'claim', reason: reason || 'claim' });
-  }
-  function pauseSession(){
-    shouldAutoResume = false;
-    pendingResumeReason = null;
-    resumeInFlight = false;
-    if (socket.connected){ socket.emit('player_pause'); }
-    if (!socket.disconnected){ manualDisconnect = true; socket.disconnect(); }
-  }
-  function attemptResume(reason){
-    if (!shouldAutoResume) return;
-    if (!sessionInfo || !sessionInfo.pin || !sessionInfo.sessionToken) return;
-    if (!socket.connected){
-      pendingResumeReason = reason || pendingResumeReason || 'auto';
-      if (socket.disconnected){ try{ socket.connect(); }catch(e){} }
-      return;
-    }
-    pendingResumeReason = null;
-    if (resumeInFlight) return;
-    resumeInFlight = true;
-    setStatus('Resuming your spot…');
-    socket.emit('player_resume', { pin: sessionInfo.pin, sessionToken: sessionInfo.sessionToken }, (res)=>{
-      resumeInFlight = false;
-      if (!res || !res.ok){
-        if (res && res.code === 'session_mismatch'){ setStatus('Session expired — please join again.'); clearStoredSession(); }
-        else { setStatus(res?.error || 'Resume failed.'); }
-        return;
-      }
-      setStatus('');
-      if (res.sessionToken){
-        sessionInfo = { pin: res.pin, name: res.name, sessionToken: res.sessionToken };
-        saveSession(sessionInfo);
-        updateSavedSessionUI();
-      }
-    });
-  }
-
-  updateSavedSessionUI();
-  if (sessionInfo && !document.hidden){
-    setStatus('Resuming your saved spot…');
-    broadcastClaim('startup');
-    attemptResume('startup');
-  }
   const nextReadyCountdownPlayer = document.getElementById('nextReadyCountdownPlayer');
   function showBanner(title, sub, ms=2600){
     if (!winnerBanner) return;
@@ -304,28 +183,8 @@
   function endHold(){ if (!inHold) return; inHold=false; socket.emit('hold_release'); if (phase==='countdown' || phase==='active'){ releasedOut=true; disabledUI=true; } updateHoldVisual(); }
 
   // events
-  joinBtn.onclick = ()=>{
-    const name = nameInput.value.trim().slice(0,24) || 'Player';
-    clearStoredSession();
-    shouldAutoResume = true;
-    manualDisconnect = false;
-    setStatus('Joining…');
-    socket.emit('player_join', { name });
-  };
-  reconnectBtn.onclick = ()=>{
-    const typedPin = pinInput.value.trim();
-    if (sessionInfo && sessionInfo.pin && (!typedPin || typedPin === sessionInfo.pin)){
-      shouldAutoResume = true;
-      manualDisconnect = false;
-      setStatus('Resuming your saved spot…');
-      broadcastClaim('manual-resume');
-      attemptResume('manual-button');
-      return;
-    }
-    if (!typedPin){ alert('Enter your PIN'); return; }
-    setStatus('Reconnecting…');
-    socket.emit('player_reconnect', { pin: typedPin });
-  };
+  joinBtn.onclick = ()=>{ const name = nameInput.value.trim().slice(0,24) || 'Player'; socket.emit('player_join', { name }); };
+  reconnectBtn.onclick = ()=>{ const pin = pinInput.value.trim(); if (!pin) return alert('Enter your PIN'); socket.emit('player_reconnect', { pin }); };
   if (toggleReadyBtn){
     toggleReadyBtn.onclick = ()=>{
       if (!nextReadyState || !nextReadyState.active) return;
@@ -343,93 +202,20 @@
   window.addEventListener('mouseup',      e=>{ endHold(); });
   holdArea.addEventListener('mouseleave', e=>{ endHold(); });
 
-  document.addEventListener('visibilitychange', ()=>{
-    if (document.hidden){
-      if (sessionInfo){ setStatus('Paused while in background.'); }
-      pauseSession();
-    } else {
-      manualDisconnect = false;
-      if (sessionInfo){
-        shouldAutoResume = true;
-        setStatus('');
-        broadcastClaim('visible');
-        attemptResume('visible');
-      } else {
-        shouldAutoResume = false;
-        setStatus('');
-        if (socket.disconnected){ try{ socket.connect(); }catch(e){} }
-      }
-    }
-  });
-  window.addEventListener('beforeunload', ()=>{
-    if (socket.connected){ socket.emit('player_pause'); }
-  });
-
-  socket.on('connect', ()=>{
-    manualDisconnect = false;
-    if (sessionInfo && shouldAutoResume){
-      attemptResume(pendingResumeReason || 'connect');
-    } else {
-      setStatus('');
-    }
-  });
-  socket.on('connect_error', ()=>{
-    if (sessionInfo){ setStatus('Network issue — retrying…'); }
-  });
-  socket.on('disconnect', (reason)=>{
-    resumeInFlight = false;
-    pendingResumeReason = null;
-    joined = false;
-    if (reason === 'io client disconnect'){ return; }
-    manualDisconnect = false;
-    if (sessionInfo){
-      shouldAutoResume = true;
-      setStatus('Connection lost. Waiting to resume…');
-      attemptResume('disconnect');
-    } else {
-      setStatus('Connection lost.');
-      if (!document.hidden && socket.disconnected){ try{ socket.connect(); }catch(e){} }
-    }
-  });
-
   socket.on('joined', (d)=>{
     joined=true; myId=d.id; playerName.textContent=d.name; tokenCount.textContent='🏆 '+d.tokens;
     myPinEl.textContent = d.pin || '';
-    if (pinInput){ pinInput.value = d.pin || ''; }
-    if (d.sessionToken){
-      sessionInfo = { pin: d.pin, name: d.name, sessionToken: d.sessionToken };
-      saveSession(sessionInfo);
-      updateSavedSessionUI();
-      broadcastClaim('joined');
-    }
-    shouldAutoResume = true;
-    manualDisconnect = false;
-    resumeInFlight = false;
-    pendingResumeReason = null;
-    setStatus('');
     joinCard.style.display='none'; gameCard.style.display='block';
     askNotifyPermission();
     setPhaseUI('idle'); updateHoldVisual(); stopTimer(); cancelHeartbeat();
     updateNextReadyUI();
   });
   socket.on('reconnect_result', (r)=>{
-    if (!r.ok){ setStatus(r.error || 'Reconnect failed.'); alert(r.error || 'Reconnect failed'); return; }
-    setStatus('Reconnected with your PIN.');
+    if (!r.ok){ alert(r.error || 'Reconnect failed'); return; }
     alert('Reconnected as '+(r.name||'Player'));
   });
 
-  socket.on('lobby_update', (l)=>{
-    if (!joined) return;
-    const me=(l.lobby||[]).find(p=>p.id===myId);
-    if (me){
-      tokenCount.textContent='🏆 '+me.tokens;
-      if (sessionInfo && me.name && sessionInfo.name !== me.name){
-        sessionInfo = { pin: sessionInfo.pin, name: me.name, sessionToken: sessionInfo.sessionToken };
-        saveSession(sessionInfo);
-        updateSavedSessionUI();
-      }
-    }
-  });
+  socket.on('lobby_update', (l)=>{ if (!joined) return; const me=(l.lobby||[]).find(p=>p.id===myId); if (me){ tokenCount.textContent='🏆 '+me.tokens; } });
 
   socket.on('next_round_ready_state', (d={})=>{
     nextReadyState = Object.assign({ active:false, readyIds:[] }, d || {});
