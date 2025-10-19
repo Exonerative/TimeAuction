@@ -15,19 +15,30 @@
   const timerSub = document.getElementById('timerSub');
   const timerCard = document.querySelector('.timer-card');
   const statusBanner = document.getElementById('statusBanner');
+  const audioToggle = document.getElementById('audioToggle');
   const nextReadySummary = document.getElementById('nextReadySummary');
   const nextReadyCountdown = document.getElementById('nextReadyCountdown');
   const scoreboardList = document.getElementById('scoreboardList');
   const scoreboardEmpty = document.getElementById('scoreboardEmpty');
   const historyList = document.getElementById('historyList');
   const historyEmpty = document.getElementById('historyEmpty');
+  const winnerSpotlight = document.getElementById('winnerSpotlight');
+  const spotlightWinnerName = document.getElementById('spotlightWinnerName');
+  const spotlightTokens = document.getElementById('spotlightTokens');
+  const spotlightHold = document.getElementById('spotlightHold');
+  const spotlightRound = document.getElementById('spotlightRound');
+  const confettiContainer = winnerSpotlight ? winnerSpotlight.querySelector('.spotlight-confetti') : null;
 
   const MAX_HISTORY = 4;
   const MAX_SCOREBOARD_ROWS = 5;
-  let latestState = { scoreboard: [], history: [], scoreboardVisible: true };
+  let latestState = { scoreboard: [], history: [], scoreboardVisible: true, lastWinnerName: '', lastWinnerTokens: null, lastWinnerMs: null, lastWinnerRound: null };
   let timerInterval = null;
   let statusHoldUntil = 0;
   let currentTimerPhaseClass = '';
+  let phaseTransitionTimeout = null;
+  let lastPhaseForAudio = '';
+  let winnerSpotlightTimer = null;
+  let audioManager = null;
 
   function pad(value){ return String(value).padStart(2, '0'); }
   function formatClock(ms){
@@ -107,7 +118,19 @@
       timerCard.classList.remove(currentTimerPhaseClass);
     }
     timerCard.classList.add(next);
+    timerCard.classList.add('phase-transition');
+    if (phaseTransitionTimeout){
+      clearTimeout(phaseTransitionTimeout);
+    }
+    phaseTransitionTimeout = setTimeout(()=> timerCard.classList.remove('phase-transition'), 680);
     currentTimerPhaseClass = next;
+    if (audioManager && typeof audioManager.play === 'function'){
+      if (lastPhaseForAudio !== next){
+        if (phase === 'countdown') audioManager.play('countdown');
+        else if (phase === 'active') audioManager.play('active');
+      }
+    }
+    lastPhaseForAudio = next;
   }
 
   function startTimer(){
@@ -227,7 +250,8 @@
     }
     scoreboardEmpty.style.display = 'none';
     scoreboardList.style.display = rows.length ? 'grid' : 'none';
-    rows.slice(0, MAX_SCOREBOARD_ROWS).forEach((row)=>{
+    const lastWinner = (latestState.lastWinnerName || '').toLowerCase();
+    rows.slice(0, MAX_SCOREBOARD_ROWS).forEach((row, index)=>{
       const li = document.createElement('li');
       li.className = 'scoreboard-row';
       const rank = document.createElement('span');
@@ -239,9 +263,30 @@
       const tokens = document.createElement('span');
       tokens.className = 'tokens';
       tokens.textContent = `${row.tokens != null ? row.tokens : 0} 🪙`;
+      const accessibleParts = [];
+      accessibleParts.push(`Rank ${row.rank != null ? row.rank : '?'}`);
+      accessibleParts.push(row.name || 'Player');
+      accessibleParts.push(`${row.tokens != null ? row.tokens : 0} tokens`);
       li.appendChild(rank);
       li.appendChild(name);
       li.appendChild(tokens);
+      if (index === 0){
+        li.classList.add('leader');
+        accessibleParts.push('Current leader');
+      }
+      if (lastWinner && row.name && row.name.toLowerCase() === lastWinner){
+        li.classList.add('recent-winner');
+        accessibleParts.push('Most recent round winner');
+        const badge = document.createElement('span');
+        badge.className = 'badge badge-winner';
+        badge.textContent = 'Winner';
+        li.appendChild(badge);
+      }
+      li.setAttribute('aria-label', accessibleParts.join(', '));
+      const sr = document.createElement('span');
+      sr.className = 'sr-only';
+      sr.textContent = accessibleParts.join(', ');
+      li.appendChild(sr);
       scoreboardList.appendChild(li);
       li.classList.add('enter');
       setTimeout(()=> li.classList.remove('enter'), 1700);
@@ -325,22 +370,32 @@
     const history = Array.isArray(latestState.history) ? latestState.history.slice() : [];
     history.unshift(entry);
     latestState.history = history.slice(0, MAX_HISTORY);
+    latestState.lastWinnerName = info.winner || '';
+    latestState.lastWinnerTokens = info.winnerTokens;
+    latestState.lastWinnerMs = info.winnerMs;
+    latestState.lastWinnerRound = info.round;
     renderHistory();
+    renderScoreboard();
     if (info.winner){
       showStatus(`Round ${info.round} winner: ${info.winner}`, 6000);
+      showWinnerSpotlight(info);
+      if (audioManager) audioManager.play('winner');
     } else {
       showStatus(`Round ${info.round} completed`, 4000);
+      hideWinnerSpotlight();
     }
   });
 
   socket.on('bonus_round_armed', (info={})=>{
     const mult = info.value != null ? `×${info.value}` : '';
     showStatus(`Bonus round armed ${mult}!`, 6000);
+    if (audioManager) audioManager.play('bonus');
   });
 
   socket.on('final_round_armed', (info={})=>{
     const tokens = info.tokens != null ? `${info.tokens} 🪙` : '';
     showStatus(`Final round ready ${tokens}`, 7000);
+    if (audioManager) audioManager.play('final');
   });
 
   socket.on('game_over', (info={})=>{
@@ -368,4 +423,157 @@
       startTimer();
     }
   });
+
+  function hideWinnerSpotlight(){
+    if (!winnerSpotlight) return;
+    if (winnerSpotlightTimer){
+      clearTimeout(winnerSpotlightTimer);
+      winnerSpotlightTimer = null;
+    }
+    winnerSpotlight.classList.remove('active');
+    winnerSpotlight.setAttribute('aria-hidden', 'true');
+  }
+
+  function populateConfetti(){
+    if (!confettiContainer) return;
+    confettiContainer.innerHTML = '';
+    for (let i = 0; i < 26; i += 1){
+      const piece = document.createElement('span');
+      piece.style.setProperty('--x', `${Math.random() * 100}%`);
+      piece.style.animationDelay = `${Math.random() * 0.4}s`;
+      piece.style.background = i % 2 === 0 ? 'linear-gradient(180deg,#38d5ff,#f6a55d)' : 'linear-gradient(180deg,#f6a55d,#ffd87b)';
+      confettiContainer.appendChild(piece);
+    }
+  }
+
+  function showWinnerSpotlight(info){
+    if (!winnerSpotlight) return;
+    if (winnerSpotlightTimer){
+      clearTimeout(winnerSpotlightTimer);
+      winnerSpotlightTimer = null;
+    }
+    if (spotlightWinnerName) spotlightWinnerName.textContent = info.winner || '—';
+    if (spotlightTokens){
+      const tokens = info.winnerTokens != null ? info.winnerTokens : 0;
+      spotlightTokens.innerHTML = '';
+      const strong = document.createElement('strong');
+      strong.textContent = tokens;
+      spotlightTokens.appendChild(strong);
+      spotlightTokens.appendChild(document.createTextNode(' 🪙'));
+    }
+    if (spotlightHold){
+      const holdText = formatMs(info.winnerMs);
+      const safeHold = holdText !== '—' ? holdText : '0s';
+      spotlightHold.innerHTML = '';
+      const strong = document.createElement('strong');
+      strong.textContent = safeHold;
+      spotlightHold.appendChild(strong);
+      spotlightHold.appendChild(document.createTextNode(' hold'));
+    }
+    if (spotlightRound){
+      const round = info.round != null ? info.round : '?';
+      spotlightRound.textContent = `Round ${round}`;
+    }
+    populateConfetti();
+    winnerSpotlight.classList.add('active');
+    winnerSpotlight.setAttribute('aria-hidden', 'false');
+    winnerSpotlightTimer = setTimeout(()=> hideWinnerSpotlight(), 6200);
+  }
+
+  function createAudioManager(toggleButton){
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass){
+      if (toggleButton){
+        toggleButton.disabled = true;
+        toggleButton.textContent = 'Audio unavailable';
+      }
+      return { play(){}, setMuted(){}, isMuted(){ return true; } };
+    }
+    const ctx = new AudioContextClass();
+    let muted = true;
+    let unlocked = false;
+    const updateToggle = ()=>{
+      if (!toggleButton) return;
+      toggleButton.setAttribute('aria-pressed', String(!muted));
+      toggleButton.textContent = muted ? 'Enable Audio' : 'Audio Enabled';
+    };
+    const unlock = ()=>{
+      if (unlocked) return;
+      ctx.resume().catch(()=>{});
+      unlocked = true;
+    };
+    const requestUnlock = ()=>{
+      unlock();
+      document.removeEventListener('pointerdown', requestUnlock);
+      document.removeEventListener('keydown', requestUnlock);
+    };
+    document.addEventListener('pointerdown', requestUnlock, { once: true });
+    document.addEventListener('keydown', requestUnlock, { once: true });
+    if (toggleButton){
+      toggleButton.addEventListener('click', ()=>{
+        muted = !muted;
+        if (!muted) unlock();
+        updateToggle();
+      });
+      updateToggle();
+    }
+    function scheduleTone(freqs, duration, opts={}){
+      if (muted) return;
+      unlock();
+      const start = ctx.currentTime + 0.03;
+      const gain = ctx.createGain();
+      const maxGain = opts.gain != null ? opts.gain : 0.18;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(maxGain, start + 0.08);
+      gain.gain.exponentialRampToValueAtTime(maxGain * 0.35, start + duration * 0.75);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+      gain.connect(ctx.destination);
+      freqs.forEach((freq, idx)=>{
+        const osc = ctx.createOscillator();
+        osc.type = opts.type || 'triangle';
+        osc.frequency.setValueAtTime(freq, start);
+        if (opts.detune){
+          osc.detune.setValueAtTime(opts.detune * idx, start);
+        }
+        osc.connect(gain);
+        osc.start(start);
+        osc.stop(start + duration);
+      });
+    }
+    return {
+      play(name){
+        if (muted) return;
+        switch(name){
+          case 'winner':
+            scheduleTone([392,523,659], 1.4, { type: 'sawtooth', gain: 0.16, detune: 6 });
+            scheduleTone([784], 0.9, { type: 'triangle', gain: 0.12 });
+            break;
+          case 'bonus':
+            scheduleTone([440,660], 0.9, { type: 'triangle', gain: 0.12 });
+            break;
+          case 'final':
+            scheduleTone([523,698,880], 1.6, { type: 'square', gain: 0.12, detune: 5 });
+            break;
+          case 'countdown':
+            scheduleTone([330], 0.45, { type: 'sine', gain: 0.1 });
+            break;
+          case 'active':
+            scheduleTone([520,780], 0.6, { type: 'sawtooth', gain: 0.11 });
+            break;
+          default:
+            break;
+        }
+      },
+      setMuted(next){
+        muted = !!next;
+        if (!muted) unlock();
+        updateToggle();
+      },
+      isMuted(){
+        return muted;
+      },
+    };
+  }
+
+  audioManager = createAudioManager(audioToggle);
 })();

@@ -55,6 +55,28 @@
         repeating-linear-gradient(90deg,rgba(255,255,255,0.04) 0px,rgba(255,255,255,0.02) 2px,transparent 4px,transparent 12px);
       opacity:0.4;
     }
+    #ambientField{
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      background:
+        radial-gradient(60% 60% at 20% 20%,rgba(56,213,255,0.12),transparent 60%),
+        radial-gradient(70% 70% at 80% 70%,rgba(246,165,93,0.1),transparent 65%),
+        repeating-linear-gradient(115deg,rgba(10,40,66,0.4) 0px,rgba(10,40,66,0.4) 2px,transparent 2px,transparent 16px);
+      mix-blend-mode:screen;
+      opacity:0.55;
+      animation:ambientDrift 22s linear infinite;
+    }
+    #ambientField::after{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:radial-gradient(12% 12% at 20% 30%,rgba(255,255,255,0.25),transparent 70%),
+        radial-gradient(8% 8% at 78% 55%,rgba(56,213,255,0.4),transparent 70%),
+        radial-gradient(10% 10% at 40% 80%,rgba(246,165,93,0.35),transparent 65%);
+      mix-blend-mode:screen;
+      animation:ambientTwinkle 14s ease-in-out infinite;
+    }
     .layout{
       width:clamp(960px,92vw,1480px);
       height:calc(100vh - 48px);
@@ -224,6 +246,23 @@
       opacity:0.6;
       pointer-events:none;
     }
+    .timer-card .timer-transition{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      overflow:hidden;
+      border-radius:inherit;
+    }
+    .timer-card .timer-transition::before{
+      content:"";
+      position:absolute;
+      inset:-40%;
+      background:conic-gradient(from 140deg,rgba(56,213,255,0.32),transparent 65%,rgba(246,165,93,0.28));
+      opacity:0;
+    }
+    .timer-card.phase-transition .timer-transition::before{
+      animation:timerPhaseSweep 0.68s cubic-bezier(0.22,0.61,0.36,1);
+    }
     .timer-content{position:relative;z-index:1;display:flex;flex-direction:column;gap:18px;}
     .timer-label{
       font-size:1.1rem;
@@ -243,6 +282,9 @@
       color:var(--muted);
       min-height:1.2em;
       letter-spacing:0.08em;
+    }
+    .timer-card.phase-transition{
+      animation:timerPhasePop 0.68s cubic-bezier(0.22,0.61,0.36,1);
     }
     .timer-card.phase-countdown{
       border-color:rgba(246,165,93,0.6);
@@ -327,7 +369,45 @@
     .scoreboard-row.enter::after{
       animation:statusSweep 1.4s ease;
     }
-    .scoreboard-row .rank{font-size:1.1rem;font-weight:700;color:var(--accent);letter-spacing:0.12em;}
+    .scoreboard-row.leader{
+      border-color:rgba(255,214,123,0.85);
+      background:linear-gradient(140deg,rgba(14,42,66,0.92),rgba(45,28,8,0.72));
+      box-shadow:0 18px 48px rgba(255,202,115,0.35);
+      padding-left:48px;
+    }
+    .scoreboard-row.leader .name,.scoreboard-row.leader .rank{color:#ffd87b;}
+    .scoreboard-row.leader::before{
+      content:"\1F3C6";
+      font-size:1.3rem;
+      position:absolute;
+      left:14px;
+      top:50%;
+      transform:translateY(-50%);
+      filter:drop-shadow(0 0 6px rgba(255,214,123,0.55));
+    }
+    .scoreboard-row.leader .rank{padding-left:0;}
+    .scoreboard-row.recent-winner{
+      border-color:rgba(56,213,255,0.55);
+      box-shadow:0 16px 52px rgba(56,213,255,0.35);
+      background:linear-gradient(160deg,rgba(8,40,66,0.92),rgba(6,28,46,0.78));
+    }
+    .scoreboard-row.recent-winner .name{color:var(--accent);}
+    .scoreboard-row .badge{
+      position:absolute;
+      top:10px;
+      right:12px;
+      padding:4px 12px;
+      border-radius:999px;
+      font-size:0.7rem;
+      letter-spacing:0.18em;
+      text-transform:uppercase;
+      font-weight:600;
+      background:rgba(8,38,60,0.7);
+      border:1px solid rgba(56,213,255,0.45);
+      color:rgba(56,213,255,0.85);
+      pointer-events:none;
+    }
+    .scoreboard-row .rank{font-size:1.1rem;font-weight:700;color:var(--accent);letter-spacing:0.12em;display:flex;align-items:center;gap:6px;}
     .scoreboard-row .name{font-size:1.05rem;font-weight:600;letter-spacing:0.05em;}
     .scoreboard-row .tokens{font-size:1.25rem;font-weight:700;letter-spacing:0.08em;}
     .history-list{
@@ -372,6 +452,139 @@
       background:radial-gradient(80% 80% at 50% 35%,transparent 0%,rgba(0,0,0,0.55) 100%);
       pointer-events:none;
     }
+    .winner-spotlight{
+      position:absolute;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:radial-gradient(120% 120% at 50% 40%,rgba(7,26,42,0.92),rgba(2,10,18,0.88));
+      backdrop-filter:blur(14px);
+      opacity:0;
+      pointer-events:none;
+      transition:opacity 0.4s ease;
+      z-index:20;
+    }
+    .winner-spotlight.active{
+      opacity:1;
+      pointer-events:auto;
+    }
+    .winner-spotlight .spotlight-core{
+      position:relative;
+      padding:56px 72px;
+      border-radius:38px;
+      background:linear-gradient(160deg,rgba(6,20,34,0.95),rgba(9,46,72,0.82));
+      border:1px solid rgba(56,213,255,0.5);
+      box-shadow:0 42px 160px rgba(0,0,0,0.65);
+      text-align:center;
+      overflow:hidden;
+    }
+    .winner-spotlight.active .spotlight-core{
+      animation:spotlightReveal 0.85s cubic-bezier(0.23,1,0.32,1);
+    }
+    .winner-spotlight .spotlight-core::before,
+    .winner-spotlight .spotlight-core::after{
+      content:"";
+      position:absolute;
+      inset:-40%;
+      background:radial-gradient(40% 40% at 50% 20%,rgba(56,213,255,0.25),transparent 75%);
+      mix-blend-mode:screen;
+      opacity:0.7;
+    }
+    .winner-spotlight .spotlight-core::after{
+      background:radial-gradient(35% 35% at 50% 80%,rgba(246,165,93,0.25),transparent 70%);
+    }
+    .spotlight-round{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:6px 18px;
+      border-radius:999px;
+      border:1px solid rgba(56,213,255,0.5);
+      background:rgba(8,38,60,0.6);
+      font-size:0.85rem;
+      letter-spacing:0.2em;
+      text-transform:uppercase;
+      color:var(--muted);
+    }
+    .spotlight-title{
+      margin-top:18px;
+      font-size:1rem;
+      letter-spacing:0.28em;
+      text-transform:uppercase;
+      color:rgba(255,255,255,0.75);
+    }
+    .spotlight-name{
+      margin:18px 0 12px;
+      font-family:"Orbitron","Inter",system-ui;
+      font-size:clamp(3rem,6vw,4.6rem);
+      letter-spacing:0.08em;
+      color:#e6f9ff;
+      text-shadow:0 0 42px rgba(56,213,255,0.7);
+    }
+    .spotlight-stats{
+      display:flex;
+      gap:18px;
+      justify-content:center;
+      margin-top:12px;
+      font-weight:600;
+      letter-spacing:0.08em;
+      color:var(--muted);
+    }
+    .spotlight-stats span{display:flex;align-items:center;gap:6px;}
+    .spotlight-stats strong{font-size:1.1rem;color:#f8fafc;}
+    .spotlight-footer{
+      margin-top:28px;
+      font-size:0.9rem;
+      letter-spacing:0.18em;
+      text-transform:uppercase;
+      color:rgba(255,255,255,0.6);
+    }
+    .spotlight-confetti{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      overflow:hidden;
+    }
+    .spotlight-confetti span{
+      position:absolute;
+      width:6px;
+      height:14px;
+      background:linear-gradient(180deg,#38d5ff,#f6a55d);
+      top:-20px;
+      left:var(--x,50%);
+      opacity:0;
+      animation:confettiFall 1.8s ease-in forwards;
+    }
+    .hud-button{
+      background:linear-gradient(120deg,rgba(9,30,52,0.95),rgba(7,46,79,0.72));
+      border:1px solid rgba(61,198,255,0.45);
+      border-radius:16px;
+      padding:10px 16px;
+      color:var(--text);
+      font-weight:600;
+      letter-spacing:0.08em;
+      text-transform:uppercase;
+      cursor:pointer;
+      transition:transform 0.2s ease,box-shadow 0.3s ease;
+    }
+    .hud-button:focus-visible{
+      outline:2px solid var(--accent);
+      outline-offset:2px;
+    }
+    .hud-button:hover{transform:translateY(-1px);box-shadow:0 12px 24px rgba(0,0,0,0.35);}
+    .hud-button[aria-pressed="true"]{background:linear-gradient(140deg,rgba(9,46,79,0.95),rgba(9,66,102,0.82));}
+    .sr-only{
+      position:absolute;
+      width:1px;
+      height:1px;
+      padding:0;
+      margin:-1px;
+      overflow:hidden;
+      clip:rect(0,0,0,0);
+      white-space:nowrap;
+      border:0;
+    }
     @keyframes ringSpin{
       from{transform:rotate(0deg);}to{transform:rotate(360deg);}
     }
@@ -385,8 +598,40 @@
       0%,100%{box-shadow:0 0 12px rgba(56,213,255,0.4);}
       50%{box-shadow:0 0 18px rgba(56,213,255,0.65);}
     }
+    @keyframes timerPhasePop{
+      0%{transform:scale(0.96);box-shadow:0 16px 60px rgba(4,32,56,0.65);}
+      55%{transform:scale(1.02);box-shadow:0 34px 120px rgba(56,213,255,0.45);}
+      100%{transform:scale(1);}
+    }
+    @keyframes timerPhaseSweep{
+      0%{opacity:0;transform:rotate(0deg) scale(0.8);}
+      40%{opacity:1;}
+      100%{opacity:0;transform:rotate(180deg) scale(1.1);}
+    }
+    @keyframes spotlightReveal{
+      0%{transform:translateY(40px) scale(0.92);opacity:0;}
+      50%{transform:translateY(-12px) scale(1.04);opacity:1;}
+      100%{transform:translateY(0) scale(1);opacity:1;}
+    }
+    @keyframes confettiFall{
+      0%{transform:translateY(0) rotate(0deg);opacity:0;}
+      10%{opacity:1;}
+      100%{transform:translateY(360px) rotate(220deg);opacity:0;}
+    }
+    @keyframes ambientDrift{
+      0%{background-position:0 0,0 0,0 0;}
+      100%{background-position:200px 180px,-180px -160px,240px 200px;}
+    }
+    @keyframes ambientTwinkle{
+      0%,100%{opacity:0.35;}
+      45%{opacity:0.65;}
+      70%{opacity:0.45;}
+    }
     @media (prefers-reduced-motion: reduce){
       *,*::before,*::after{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition:none !important;}
+      #ambientField{animation:none !important;}
+      #ambientField::after{animation:none !important;}
+      .spotlight-confetti span{display:none !important;}
     }
     @media (max-width:1280px){
       .layout{width:94vw;padding:24px 28px;}
@@ -416,6 +661,7 @@
   </style>
 </head>
 <body>
+  <div id="ambientField" aria-hidden="true"></div>
   <div class="layout">
     <header class="hud-bar">
       <div class="hud-cluster">
@@ -431,10 +677,12 @@
       </div>
       <div class="hud-cluster hud-cluster--column">
         <div id="statusBanner" class="status-banner hidden" aria-live="polite">Waiting for host…</div>
+        <button id="audioToggle" class="hud-button" type="button" aria-pressed="false">Enable Audio</button>
       </div>
     </header>
     <main class="command-deck">
       <section class="timer-card" aria-live="polite">
+        <div class="timer-transition" aria-hidden="true"></div>
         <div class="timer-content">
           <div class="timer-label" id="timerLabel">Timer</div>
           <div class="timer-value" id="timerValue">00:00</div>
@@ -450,15 +698,28 @@
           </div>
         </section>
       </div>
-      <section class="card history-panel" aria-live="polite">
-        <div class="card-title">Recent Rounds</div>
-        <div class="scroll-shell">
-          <ul id="historyList" class="history-list"></ul>
-          <p id="historyEmpty" class="empty-note">Awaiting first results…</p>
-        </div>
-      </section>
-    </main>
-    <div class="vignette" aria-hidden="true"></div>
+    <section class="card history-panel" aria-live="polite">
+      <div class="card-title">Recent Rounds</div>
+      <div class="scroll-shell">
+        <ul id="historyList" class="history-list"></ul>
+        <p id="historyEmpty" class="empty-note">Awaiting first results…</p>
+      </div>
+    </section>
+  </main>
+  <div class="vignette" aria-hidden="true"></div>
+  <div id="winnerSpotlight" class="winner-spotlight" role="alert" aria-live="assertive" aria-hidden="true">
+    <div class="spotlight-core">
+      <div class="spotlight-confetti" aria-hidden="true"></div>
+      <span class="spotlight-round" id="spotlightRound">Round 0</span>
+      <div class="spotlight-title">Champion of the round</div>
+      <div class="spotlight-name" id="spotlightWinnerName">—</div>
+      <div class="spotlight-stats">
+        <span id="spotlightTokens"><strong>0</strong>🪙</span>
+        <span id="spotlightHold"><strong>0s</strong> hold</span>
+      </div>
+      <div class="spotlight-footer">Prepare for the next challenge</div>
+    </div>
+  </div>
   </div>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/public/presentation.js"></script>
