@@ -30,6 +30,7 @@
   const fStatusChip = document.getElementById('fStatusChip');
   const fPreview = document.getElementById('fPreview');
   const toastsEl = document.getElementById('toasts');
+  const openPresentationBtn = document.getElementById('openPresentation');
 
   const APPLIED_TIMEOUT = 3200;
   const appliedTimers = new WeakMap();
@@ -138,6 +139,55 @@
 
   document.getElementById('copyUrl').onclick = async ()=>{ try{ await navigator.clipboard.writeText(document.getElementById('joinUrl').textContent.trim()); }catch(e){} };
   document.getElementById('cleanGhosts').onclick = ()=> socket.emit('host_clean_ghosts');
+
+  let presentationWindow = null;
+  let presentationWindowWatch = null;
+  function clearPresentationWatcher(){ if (presentationWindowWatch){ clearInterval(presentationWindowWatch); presentationWindowWatch = null; } }
+  function enablePresentationButton(title){
+    if (!openPresentationBtn) return;
+    openPresentationBtn.disabled = false;
+    openPresentationBtn.removeAttribute('aria-disabled');
+    openPresentationBtn.removeAttribute('data-blocked');
+    openPresentationBtn.title = title || 'Open a new presentation window';
+  }
+  function watchPresentationWindow(){
+    if (!openPresentationBtn) return;
+    clearPresentationWatcher();
+    if (!presentationWindow) return;
+    presentationWindowWatch = setInterval(()=>{
+      if (!presentationWindow || presentationWindow.closed){
+        clearPresentationWatcher();
+        presentationWindow = null;
+        enablePresentationButton();
+      }
+    }, 1000);
+  }
+  if (openPresentationBtn){
+    openPresentationBtn.addEventListener('click', ()=>{
+      if (openPresentationBtn.hasAttribute('data-blocked')) return;
+      if (presentationWindow && !presentationWindow.closed){
+        try{ presentationWindow.focus(); }catch(e){}
+        return;
+      }
+      const win = window.open('/presentation', 'timebank_presentation');
+      if (win){
+        presentationWindow = win;
+        try{ win.focus(); }catch(e){}
+        enablePresentationButton('Presentation window opened in a new tab or window.');
+        watchPresentationWindow();
+      } else {
+        openPresentationBtn.disabled = true;
+        openPresentationBtn.setAttribute('aria-disabled', 'true');
+        openPresentationBtn.setAttribute('data-blocked', '1');
+        openPresentationBtn.title = 'Pop-up blocked. Allow pop-ups for this site, then return to retry.';
+      }
+    });
+    window.addEventListener('focus', ()=>{
+      if (openPresentationBtn.hasAttribute('data-blocked')){
+        enablePresentationButton();
+      }
+    });
+  }
 
   const hostScoreToggle = document.getElementById('hostScoreToggle');
   const publicScoreToggle = document.getElementById('publicScoreToggle');

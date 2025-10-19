@@ -93,6 +93,8 @@ const state = {
   nextRound: { requirement: 0, countdownMs: 3000, countdownStartTs: 0, countdownTimer: null },
 };
 
+const presentationSockets = new Set();
+
 function resetRoundSets(){
   state.roundHolds = {};
   state.requiredPressSet = new Set();
@@ -174,6 +176,7 @@ function emitNextRoundReadyState(){
     countdown: (active && state.nextRound.countdownStartTs) ? { startTs: state.nextRound.countdownStartTs, durationMs: state.nextRound.countdownMs } : null,
   };
   io.emit('next_round_ready_state', payload);
+  emitPresentationState();
 }
 function updateNextRoundReadyState({ emit=true }={}){
   if (!isBetweenRounds()){
@@ -265,9 +268,64 @@ function computeSoleChampion(){
   return rows[0];
 }
 
+function buildPresentationHistory(){
+  return state.history.slice(-8).reverse().map(h => ({
+    round: h.round,
+    winnerName: h.winnerName,
+    winnerTokens: h.winnerTokens,
+    winnerMs: h.winnerMs,
+    ts: h.ts,
+  }));
+}
+
+function buildPresentationNextRound(){
+  const active = isBetweenRounds();
+  const eligibleCount = active ? eligiblePlayersForNextRound().length : 0;
+  const countdown = (active && state.nextRound.countdownStartTs)
+    ? { startTs: state.nextRound.countdownStartTs, durationMs: state.nextRound.countdownMs }
+    : null;
+  return {
+    active,
+    readyCount: active ? state.readyForNextSet.size : 0,
+    requiredCount: active ? (state.nextRound.requirement || 0) : 0,
+    eligibleCount,
+    countdown,
+  };
+}
+
+function buildPresentationState(){
+  const scoreboardVisible = !!state.ui.showPublicScoreboard;
+  const countdown = (state.phase === 'countdown' && state.countdownStartTs)
+    ? { startTs: state.countdownStartTs, durationMs: state.countdownMs }
+    : null;
+  const roundTimer = state.roundActive ? { startTs: state.roundStartTs } : null;
+  return {
+    started: state.started,
+    phase: state.phase,
+    currentRound: state.currentRound,
+    totalRounds: state.settings.totalRounds,
+    countdown,
+    roundTimer,
+    nextRound: buildPresentationNextRound(),
+    scoreboardVisible,
+    scoreboard: scoreboardVisible ? buildPublicScoreboard() : [],
+    history: buildPresentationHistory(),
+  };
+}
+
+function emitPresentationState(){
+  if (!presentationSockets.size) return;
+  const payload = buildPresentationState();
+  for (const id of presentationSockets){
+    io.to(id).emit('presentation_state', payload);
+  }
+}
+
 function broadcastPublicScoreboard(){
-  if (!state.ui.showPublicScoreboard) return;
-  io.emit('scoreboard_update', { rows: buildPublicScoreboard() });
+  if (state.ui.showPublicScoreboard){
+    io.emit('scoreboard_update', { rows: buildPublicScoreboard() });
+  }
+  emitPresentationState();
 }
 
 // --------------------------- Host & Lobby ---------------------------
@@ -276,6 +334,7 @@ function broadcastLobby(){
   io.emit('lobby_update', { lobby: lobbyPublic, started: state.started, currentRound: state.currentRound, totalRounds: state.settings.totalRounds, roundActive: state.roundActive, phase: state.phase });
 }
 function emitHostStatus(){
+  emitPresentationState();
   if (!state.hostSocketId) return;
   const lobbyHost = Object.values(state.players).filter(p=>p.joined).map(p => ({ id:p.id, name:p.name, tokens:p.tokens, exhausted:p.exhausted, pin:p.pin }));
   const histMini = state.history.slice(-6);
@@ -525,6 +584,10 @@ app.get('/host', async (req,res)=>{
   const hostHtml = fs.readFileSync(path.join(__dirname, 'public', 'host.html'), 'utf8').replace(/__JOIN_URL__/g, joinUrl).replace(/__QR_DATA__/g, qr);
   res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.send(hostHtml);
 });
+app.get('/presentation', (req,res)=>{
+  const html = fs.readFileSync(path.join(__dirname, 'public', 'presentation.html'), 'utf8');
+  res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.send(html);
+});
 app.get('/player', (req,res)=>{
   const html = fs.readFileSync(path.join(__dirname, 'public', 'player.html'), 'utf8');
   res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.send(html);
@@ -565,6 +628,13 @@ function refreshPlayerSessionToken(player){
 // --------------------------- Sockets ---------------------------
 io.on('connection', (socket) => {
   const role = socket.handshake.query.role;
+
+  if (role === 'presentation'){
+    presentationSockets.add(socket.id);
+    try{ socket.emit('presentation_state', buildPresentationState()); }catch(e){}
+    socket.on('disconnect', ()=>{ presentationSockets.delete(socket.id); });
+    return;
+  }
 
   if (role === 'host'){
     state.hostSocketId = socket.id;
