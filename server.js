@@ -38,6 +38,7 @@ function msToHMS(ms){
 }
 function randomPin(len=4){ let s=''; for(let i=0;i<len;i++) s += Math.floor(Math.random()*10); return s; }
 function genSessionCode(){ return 'TB-' + Math.random().toString(16).slice(2,6).toUpperCase(); }
+function createPlayerSessionToken(){ return 'ps-' + Math.random().toString(36).slice(2,10) + Math.random().toString(36).slice(2,6); }
 
 
 // Bonus scheduling helper (P212)
@@ -555,6 +556,12 @@ function rebindPlayerSocket(oldId, newSocket){
   return p;
 }
 
+function refreshPlayerSessionToken(player){
+  if (!player) return null;
+  player.sessionToken = createPlayerSessionToken();
+  return player.sessionToken;
+}
+
 // --------------------------- Sockets ---------------------------
 io.on('connection', (socket) => {
   const role = socket.handshake.query.role;
@@ -725,6 +732,27 @@ io.on('connection', (socket) => {
     roundsActive: 0,
     lastVictoryRound: null,
     pin: null,
+    sessionToken: null,
+  };
+
+  const releaseHold = (player)=>{
+    const p = player; if (!p || !p.inRoundHold) return;
+    const ts = now();
+
+    if (state.phase==='active'){
+      let delta = clamp(ts - (p.holdStartTs || ts), 0, p.timeRemainingMs);
+      p.timeRemainingMs -= delta; state.roundHolds[p.id] = (state.roundHolds[p.id]||0) + delta;
+      if (p.timeRemainingMs === 0 && !p.exhausted){ p.exhausted = true; io.to(p.id).emit('exhausted'); }
+    }
+
+    p.inRoundHold = false; p.holdStartTs = null; if (p.autoExhaustTimeout){ clearTimeout(p.autoExhaustTimeout); p.autoExhaustTimeout = null; }
+
+    if (state.phase==='arming'){ state.readyHoldersAll.delete(p.id); checkAllHoldGate(); emitHostStatus(); }
+    else if (state.phase==='countdown' || state.phase==='active'){
+      if (state.lockedParticipants.has(p.id)) state.outThisRound.add(p.id);
+      emitHostStatus();
+      setTimeout(()=>{ if (state.roundActive && !Object.values(state.players).some(x=>x.inRoundHold) && anyPlayerHeldThisRound()){ endRound('auto-empty'); } }, 400);
+    }
   };
 
   socket.on('player_join', ({ name })=>{
@@ -732,7 +760,8 @@ io.on('connection', (socket) => {
     const p = state.players[socket.id]; if (!p) return;
     p.name = safe; p.joined = true;
     if (!p.pin){ p.pin = assignPinUnique(); state.pinIndex.set(p.pin, p.id); }
-    socket.emit('joined', { id: p.id, name: p.name, tokens: p.tokens, pin: p.pin });
+    refreshPlayerSessionToken(p);
+    socket.emit('joined', { id: p.id, name: p.name, tokens: p.tokens, pin: p.pin, sessionToken: p.sessionToken });
     if (state.phase==='arming'){ /* will join next round */ }
     broadcastLobby();
     updateNextRoundReadyState();
@@ -752,11 +781,32 @@ io.on('connection', (socket) => {
     const moved = rebindPlayerSocket(targetId, socket);
     if (!moved){ socket.emit('reconnect_result', { ok:false, error:'Rebind failed' }); return; }
     moved.joined = true;
-    socket.emit('joined', { id: moved.id, name: moved.name, tokens: moved.tokens, pin: moved.pin });
+    refreshPlayerSessionToken(moved);
+    socket.emit('joined', { id: moved.id, name: moved.name, tokens: moved.tokens, pin: moved.pin, sessionToken: moved.sessionToken });
     socket.emit('reconnect_result', { ok:true, name:moved.name, tokens:moved.tokens, pin:moved.pin });
     broadcastLobby();
     updateNextRoundReadyState();
     emitHostStatus(); broadcastPublicScoreboard();
+  });
+
+  socket.on('player_resume', ({ pin, sessionToken }, ack)=>{
+    const targetId = state.pinIndex.get(String(pin));
+    if (!targetId){ if (typeof ack==='function') ack({ ok:false, error:'PIN not found' }); return; }
+    const p = state.players[targetId];
+    if (!p){ if (typeof ack==='function') ack({ ok:false, error:'Player not found' }); return; }
+    if (String(p.sessionToken||'') !== String(sessionToken||'')){
+      if (typeof ack==='function') ack({ ok:false, error:'Session mismatch', code:'session_mismatch' });
+      return;
+    }
+    const moved = (targetId === socket.id) ? p : rebindPlayerSocket(targetId, socket);
+    if (!moved){ if (typeof ack==='function') ack({ ok:false, error:'Resume failed' }); return; }
+    moved.joined = true;
+    refreshPlayerSessionToken(moved);
+    socket.emit('joined', { id: moved.id, name: moved.name, tokens: moved.tokens, pin: moved.pin, sessionToken: moved.sessionToken });
+    broadcastLobby();
+    updateNextRoundReadyState();
+    emitHostStatus(); broadcastPublicScoreboard();
+    if (typeof ack==='function') ack({ ok:true, id: moved.id, name: moved.name, tokens: moved.tokens, pin: moved.pin, sessionToken: moved.sessionToken });
   });
 
   socket.on('player_ready_next', ()=>{
@@ -796,23 +846,13 @@ io.on('connection', (socket) => {
   });
 
   socket.on('hold_release', ()=>{
-    const p = state.players[socket.id]; if (!p || !p.inRoundHold) return;
-    const ts = now();
+    const p = state.players[socket.id]; if (!p) return;
+    releaseHold(p);
+  });
 
-    if (state.phase==='active'){
-      let delta = clamp(ts - (p.holdStartTs || ts), 0, p.timeRemainingMs);
-      p.timeRemainingMs -= delta; state.roundHolds[p.id] = (state.roundHolds[p.id]||0) + delta;
-      if (p.timeRemainingMs === 0 && !p.exhausted){ p.exhausted = true; socket.emit('exhausted'); }
-    }
-
-    p.inRoundHold = false; p.holdStartTs = null; if (p.autoExhaustTimeout){ clearTimeout(p.autoExhaustTimeout); p.autoExhaustTimeout = null; }
-
-    if (state.phase==='arming'){ state.readyHoldersAll.delete(p.id); checkAllHoldGate(); emitHostStatus(); }
-    else if (state.phase==='countdown' || state.phase==='active'){
-      if (state.lockedParticipants.has(p.id)) state.outThisRound.add(p.id);
-      emitHostStatus();
-      setTimeout(()=>{ if (state.roundActive && !Object.values(state.players).some(x=>x.inRoundHold) && anyPlayerHeldThisRound()){ endRound('auto-empty'); } }, 400);
-    }
+  socket.on('player_pause', ()=>{
+    const p = state.players[socket.id]; if (!p) return;
+    releaseHold(p);
   });
 
   socket.on('disconnect', ()=>{
