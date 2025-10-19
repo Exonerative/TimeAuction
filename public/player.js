@@ -194,6 +194,7 @@
   let nextReadyState = { active:false, readyIds:[] };
   let nextReadyTimer = null;
   let nextReadyCountdownCfg = null;
+  let noHoldAnnouncedRound = null;
 
   let latestLobby = { lobby: [], started:false, currentRound:0, totalRounds:0, roundActive:false, phase:'idle' };
   const latestLobbyById = new Map();
@@ -259,6 +260,7 @@
     if (immediate){
       roundRecapPanel.classList.remove('show');
       roundRecapPanel.classList.remove('closing');
+      roundRecapPanel.classList.remove('alert');
       if (roundRecapFooterNote) roundRecapFooterNote.textContent='';
       return;
     }
@@ -266,6 +268,7 @@
     roundRecapCloseTimer = setTimeout(()=>{
       roundRecapPanel.classList.remove('show');
       roundRecapPanel.classList.remove('closing');
+      roundRecapPanel.classList.remove('alert');
       if (roundRecapFooterNote) roundRecapFooterNote.textContent='';
       roundRecapCloseTimer = null;
     }, 320);
@@ -312,6 +315,31 @@
       inlineAnnouncementTimer = null;
       inlineAnnouncementText = null;
     }, Math.max(1500, ms||0));
+  }
+
+  function clearNoHoldVisual(){
+    if (roundResult){
+      roundResult.classList.remove('round-result--alert');
+      if (!roundResult.classList.contains('muted')){
+        roundResult.classList.add('muted');
+      }
+    }
+    if (holdArea){ holdArea.classList.remove('no-hold'); }
+  }
+
+  function showNoHoldBanner(round, { vibrate=true }={}){
+    const roundNumber = (typeof round === 'number' && Number.isFinite(round)) ? round : null;
+    const message = roundNumber != null ? `Round ${roundNumber}: Nobody held!` : 'Nobody held!';
+    if (roundResult){
+      roundResult.textContent = message;
+      roundResult.classList.add('round-result--alert');
+      roundResult.classList.remove('muted');
+    }
+    if (holdArea){ holdArea.classList.add('no-hold'); }
+    if (vibrate && typeof navigator !== 'undefined' && navigator.vibrate && noHoldAnnouncedRound !== roundNumber){
+      try{ navigator.vibrate([220, 90, 220]); }catch(e){}
+    }
+    if (roundNumber != null){ noHoldAnnouncedRound = roundNumber; }
   }
 
   function numberOrNull(val){ const n = Number(val); return Number.isFinite(n) ? n : null; }
@@ -375,6 +403,8 @@
     const leaderTokens = numberOrNull(data && data.leaderTokens);
     const bonusValue = numberOrNull(data && data.bonusValue);
     const myName = playerName ? playerName.textContent : '';
+    const reason = data && typeof data.reason === 'string' ? data.reason : '';
+    const isNoHold = reason === 'no-hold';
 
     const meEntry = getMyLobbyEntry();
     let myTokens = meEntry ? numberOrNull(meEntry.tokens) : null;
@@ -431,6 +461,10 @@
       subtitle = `Winner: ${winnerName}${winnerTokens != null ? ` · 🏆 ${winnerTokens}` : ''}`;
       summary = `${winnerName} held for ${held}${bonusValue && bonusValue > 1 ? ` · Bonus ×${bonusValue}` : ''}.`;
       fallbackText = `${roundLabel}: ${winnerName} held ${held}${winnerTokens != null ? ` · 🏆 ${winnerTokens}` : ''}`;
+    } else if (isNoHold){
+      subtitle = 'Nobody held this round';
+      summary = 'The round ended with zero holds — the pot stays put.';
+      fallbackText = `${roundLabel}: Nobody held!`;
     } else {
       subtitle = 'No winner this round';
       summary = 'Everyone released or timed out before the finish.';
@@ -466,6 +500,7 @@
       roundsLeftNote,
       fallback: fallbackText,
       autoHideMs: finalRound ? 9000 : 6500,
+      tone: isNoHold ? 'danger' : 'default',
     };
   }
 
@@ -493,6 +528,7 @@
         }
       }
       roundRecapPanel.classList.remove('closing');
+      roundRecapPanel.classList.toggle('alert', model.tone === 'danger');
       roundRecapPanel.classList.add('show');
       syncRoundRecapCountdown(null);
       const remain = nextReadyCountdownCfg ? Math.max(0, (nextReadyCountdownCfg.startTs + nextReadyCountdownCfg.durationMs) - serverNow()) : null;
@@ -726,6 +762,8 @@
   socket.on('arming_started', ()=>{
     nextReadyCountdownCfg = null; stopNextReadyCountdown(); if (nextReadyCountdownPlayer) nextReadyCountdownPlayer.style.display='none'; if (nextReadyPanel) nextReadyPanel.style.display='none';
     hideRoundRecap(true);
+    clearNoHoldVisual();
+    if (roundResult) roundResult.textContent='';
     if (exhausted){ disabledUI=false; try{ phaseCopy.textContent='Bank exhausted — press & hold to arm the next round (you can’t play).'; }catch(e){} }
     setPhaseUI('arming'); roundActive=false; releasedOut=false; disabledUI=false; updateHoldVisual(); stopTimer(); cancelHeartbeat(); notify('Round starting','Press & hold now — all players must hold.');
   });
@@ -757,6 +795,7 @@
     setTimeout(()=>{
       setPhaseUI('active'); roundActive=true; releasedOut=false;
       if (exhausted){ disabledUI=true; }
+      clearNoHoldVisual();
       updateHoldVisual(); roundResult.textContent=''; holdArea.classList.toggle('bonus', !!d.bonusActive);
       activeStart = ts; // exact activation epoch
       startTimer();
@@ -771,6 +810,10 @@
 
   socket.on('final_round_armed', (d={})=>{
     announceInline('Final round', 'Winner gets 🏆 '+(d.tokens||1), 3400);
+  });
+
+  socket.on('round_no_hold', (d={})=>{
+    showNoHoldBanner(typeof d.round === 'number' ? d.round : null, { vibrate:true });
   });
 
   socket.on('game_started', (d={})=>{
@@ -788,6 +831,9 @@
     applyRoundResultSnapshot(d);
     const recapModel = buildRoundRecapModel(d);
     let fallback = recapModel && recapModel.fallback ? recapModel.fallback : 'Round recap unavailable.';
+    const roundNumber = (typeof d.round === 'number' && Number.isFinite(d.round)) ? d.round : null;
+    const reason = typeof d.reason === 'string' ? d.reason : '';
+    const isNoHold = reason === 'no-hold';
     if (!recapModel){
       const roundLabel = (d && typeof d.round === 'number') ? `Round ${d.round}` : 'Round';
       if (d && d.winner){
@@ -795,10 +841,16 @@
         const tokensStr = (d && d.winnerTokens!=null) ? ` · 🏆 ${d.winnerTokens}` : '';
         fallback = `${roundLabel}: ${d.winner} held ${held}${tokensStr}`;
       } else {
-        fallback = `${roundLabel}: No winner`;
+        fallback = `${roundLabel}: ${isNoHold ? 'Nobody held!' : 'No winner'}`;
       }
     }
-    if (roundResult) roundResult.textContent = fallback;
+    if (isNoHold){
+      showNoHoldBanner(roundNumber, { vibrate: noHoldAnnouncedRound !== roundNumber });
+      if (!recapModel && roundResult) roundResult.textContent = fallback;
+    } else {
+      clearNoHoldVisual();
+      if (roundResult) roundResult.textContent = fallback;
+    }
 
     if (recapModel){ renderRoundRecap(recapModel); } else { hideRoundRecap(true); }
 
@@ -816,6 +868,7 @@
   socket.on('game_over', (d)=>{
     nextReadyCountdownCfg = null; stopNextReadyCountdown(); if (nextReadyPanel) nextReadyPanel.style.display='none'; if (nextReadyCountdownPlayer) nextReadyCountdownPlayer.style.display='none';
     hideRoundRecap(true);
+    clearNoHoldVisual();
     setPhaseUI('ended');
     // Winner banner
     if (d.champion){ finalChampion.textContent = 'Champion: '+d.champion.name+' ('+d.champion.tokens+')'; }

@@ -37,8 +37,13 @@
   .hold.pressed{ background:#0f1a14; border-color:var(--accent); }
   .hold.disabled{ background:#101318; border-color:var(--disabled); opacity:.6; }
   .hold:active{ transform:scale(.985); }
+  .hold.no-hold{ background:#1f0b12; border-color:#f87171; box-shadow:0 0 0 4px rgba(248,113,113,.25); animation:noHoldPulse 1.4s ease-in-out infinite; }
+  .hold.no-hold .holdText{ color:#fee2e2; }
+  .hold.no-hold .holdSub{ color:#fecaca; }
   .holdText{ font-size:22px; opacity:.92; text-align:center; }
   .holdSub{ color:#9aa0a6; font-size:12px; margin-top:6px; text-align:center; }
+  .round-result{ margin-top:10px; font-size:14px; color:var(--muted); font-weight:500; transition:color .2s ease, text-shadow .35s ease; }
+  .round-result.round-result--alert{ color:#fecaca; font-weight:700; text-shadow:0 0 12px rgba(248,113,113,.45); }
 
   /* Countdown overlay */
   #countdownOverlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.35); }
@@ -82,6 +87,9 @@
   #roundRecapPanel .round-recap{max-width:540px;width:100%;background:#0b0f18;border:1px solid #1f2632;border-radius:20px;box-shadow:0 18px 48px rgba(0,0,0,.45);overflow:hidden;transform:translateY(32px);opacity:0;transition:transform .28s ease,opacity .28s ease;pointer-events:auto}
   #roundRecapPanel.show .round-recap{transform:translateY(0);opacity:1}
   #roundRecapPanel.closing .round-recap{transform:translateY(32px);opacity:0}
+  #roundRecapPanel.alert .round-recap__header{background:linear-gradient(135deg,#3f1f2a 0%,#2a0e15 80%,#220910 100%);color:#ffe4e6}
+  #roundRecapPanel.alert .round-recap__subtitle{color:#fecaca}
+  #roundRecapPanel.alert .round-recap__summary{color:#ffd7dc}
   .round-recap__header{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:16px 18px;background:linear-gradient(135deg,#1f2a44 0%,#122035 65%,#101829 100%);color:#e2e8f0}
   .round-recap__title{margin:0;font-size:16px;font-weight:700;letter-spacing:.01em}
   .round-recap__subtitle{margin-top:4px;font-size:13px;color:#cbd5f5;opacity:.9}
@@ -116,6 +124,7 @@
   /* Heartbeat pulse */
   @keyframes hbBeat { 0%{transform:scale(1)} 40%{transform:scale(1.03)} 100%{transform:scale(1)} }
   .hold.hb-beat { animation: hbBeat 180ms ease-out; box-shadow: 0 0 0 0 rgba(16,185,129,.35); }
+  @keyframes noHoldPulse { 0%{box-shadow:0 0 0 4px rgba(248,113,113,.28);} 50%{box-shadow:0 0 0 12px rgba(248,113,113,.12);} 100%{box-shadow:0 0 0 4px rgba(248,113,113,.28);} }
 
 </style>
 </head>
@@ -164,7 +173,7 @@
       </div>
 
       <div id="exhaustedMsg" class="toast" style="display:none">Your time bank is exhausted. You are spectating.</div>
-      <div id="roundResult" style="margin-top:10px" class="muted"></div>
+      <div id="roundResult" class="muted round-result"></div>
 
       <div id="nextReadyPanel">
         <div class="title">Next round</div>

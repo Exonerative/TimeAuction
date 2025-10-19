@@ -39,6 +39,8 @@
   let lastPhaseForAudio = '';
   let winnerSpotlightTimer = null;
   let audioManager = null;
+  let statusTone = 'default';
+  let lastNoHoldRound = null;
 
   function pad(value){ return String(value).padStart(2, '0'); }
   function formatClock(ms){
@@ -73,9 +75,16 @@
     }
     return 'Standing by…';
   }
+  function setStatusTone(tone){
+    statusTone = tone || 'default';
+    if (!statusBanner) return;
+    statusBanner.classList.toggle('danger', statusTone === 'danger');
+  }
   function showStatus(text, ttlMs){
     if (!statusBanner) return;
+    setStatusTone(statusTone);
     if (!text){
+      setStatusTone('default');
       statusHoldUntil = 0;
       statusBanner.textContent = computeDefaultStatus();
       statusBanner.classList.remove('hidden');
@@ -104,6 +113,7 @@
   function maybeResetStatus(){
     if (!statusBanner) return;
     if (statusHoldUntil && Date.now() < statusHoldUntil) return;
+    setStatusTone('default');
     const text = computeDefaultStatus();
     statusBanner.textContent = text;
     statusBanner.classList.toggle('hidden', !text);
@@ -307,6 +317,8 @@
     items.forEach((entry)=>{
       const li = document.createElement('li');
       li.className = 'history-item';
+      const isNoHold = entry && entry.reason === 'no-hold';
+      if (isNoHold) li.classList.add('no-hold');
       const details = document.createElement('div');
       details.className = 'details';
       const round = document.createElement('span');
@@ -314,15 +326,23 @@
       round.textContent = `Round ${entry.round || '?'}`;
       const winner = document.createElement('span');
       winner.className = 'winner';
-      winner.textContent = entry.winnerName ? entry.winnerName : 'No winner';
+      if (isNoHold){
+        winner.textContent = 'Nobody held';
+      } else {
+        winner.textContent = entry.winnerName ? entry.winnerName : 'No winner';
+      }
       const meta = document.createElement('span');
       meta.className = 'meta';
       const tokens = entry.winnerTokens != null ? `${entry.winnerTokens} 🪙` : '—';
       const hold = formatMs(entry.winnerMs);
       const when = entry.ts ? new Date(entry.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
       const metaParts = [];
-      if (tokens !== '—') metaParts.push(tokens);
-      if (hold !== '—') metaParts.push(`hold ${hold}`);
+      if (isNoHold){
+        metaParts.push('No holds recorded');
+      } else {
+        if (tokens !== '—') metaParts.push(tokens);
+        if (hold !== '—') metaParts.push(`hold ${hold}`);
+      }
       if (when) metaParts.push(when);
       meta.textContent = metaParts.join(' · ');
       details.appendChild(round);
@@ -359,13 +379,27 @@
     renderScoreboard();
   });
 
+  socket.on('round_no_hold', (info={})=>{
+    const roundNumber = (typeof info.round === 'number' && Number.isFinite(info.round)) ? info.round : null;
+    const shouldChime = lastNoHoldRound !== roundNumber;
+    lastNoHoldRound = roundNumber;
+    setStatusTone('danger');
+    const label = roundNumber != null ? roundNumber : '?';
+    showStatus(`Round ${label}: Nobody held!`, 7000);
+    hideWinnerSpotlight();
+    if (shouldChime && audioManager) audioManager.play('alert');
+  });
+
   socket.on('round_result', (info={})=>{
+    const reason = typeof info.reason === 'string' ? info.reason : '';
+    const roundNumber = (typeof info.round === 'number' && Number.isFinite(info.round)) ? info.round : null;
     const entry = {
       round: info.round,
       winnerName: info.winner,
       winnerTokens: info.winnerTokens,
       winnerMs: info.winnerMs,
       ts: serverNow(),
+      reason,
     };
     const history = Array.isArray(latestState.history) ? latestState.history.slice() : [];
     history.unshift(entry);
@@ -376,29 +410,45 @@
     latestState.lastWinnerRound = info.round;
     renderHistory();
     renderScoreboard();
-    if (info.winner){
+    const isNoHold = reason === 'no-hold';
+    if (isNoHold){
+      const label = roundNumber != null ? roundNumber : '?';
+      const shouldChime = lastNoHoldRound !== roundNumber;
+      lastNoHoldRound = roundNumber;
+      setStatusTone('danger');
+      showStatus(`Round ${label}: Nobody held!`, 7000);
+      hideWinnerSpotlight();
+      if (shouldChime && audioManager) audioManager.play('alert');
+    } else if (info.winner){
+      setStatusTone('default');
       showStatus(`Round ${info.round} winner: ${info.winner}`, 6000);
       showWinnerSpotlight(info);
       if (audioManager) audioManager.play('winner');
+      lastNoHoldRound = null;
     } else {
+      setStatusTone('default');
       showStatus(`Round ${info.round} completed`, 4000);
       hideWinnerSpotlight();
+      lastNoHoldRound = null;
     }
   });
 
   socket.on('bonus_round_armed', (info={})=>{
     const mult = info.value != null ? `×${info.value}` : '';
+    setStatusTone('default');
     showStatus(`Bonus round armed ${mult}!`, 6000);
     if (audioManager) audioManager.play('bonus');
   });
 
   socket.on('final_round_armed', (info={})=>{
     const tokens = info.tokens != null ? `${info.tokens} 🪙` : '';
+    setStatusTone('default');
     showStatus(`Final round ready ${tokens}`, 7000);
     if (audioManager) audioManager.play('final');
   });
 
   socket.on('game_over', (info={})=>{
+    setStatusTone('default');
     if (info.champion && info.champion.name){
       showStatus(`Game over! Champion: ${info.champion.name}`, 8000);
     } else {
@@ -559,6 +609,10 @@
             break;
           case 'active':
             scheduleTone([520,780], 0.6, { type: 'sawtooth', gain: 0.11 });
+            break;
+          case 'alert':
+            scheduleTone([240, 360, 520], 1.1, { type: 'square', gain: 0.18, detune: 8 });
+            scheduleTone([180], 1.3, { type: 'sawtooth', gain: 0.12 });
             break;
           default:
             break;
