@@ -4,7 +4,8 @@
   "description": "Local time-bank auction game (Express + Socket.IO, static HTML build)",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "launch": "node launch-all.js"
   },
   "engines": {
     "node": ">=18"
