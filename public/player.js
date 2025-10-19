@@ -154,7 +154,33 @@
     alert('Reconnected as '+(r.name||'Player'));
   });
 
-  socket.on('lobby_update', (l)=>{ if (!joined) return; const me=(l.lobby||[]).find(p=>p.id===myId); if (me){ tokenCount.textContent='🏆 '+me.tokens; } });
+  socket.on('lobby_update', (l)=>{
+    if (!joined) return;
+    const me = (l.lobby||[]).find(p=>p.id===myId);
+    if (!me) return;
+
+    tokenCount.textContent = '🏆 ' + me.tokens;
+
+    const newExhausted = !!me.exhausted;
+    if (newExhausted === exhausted) return;
+
+    const prevExhausted = exhausted;
+    exhausted = newExhausted;
+
+    if (!exhausted && prevExhausted){
+      disabledUI = false;
+      releasedOut = false;
+      inHold = false;
+      setPhaseUI('idle');
+      try{ exhaustedMsg.style.display='none'; }catch(e){}
+      updateHoldVisual();
+    } else if (exhausted && !prevExhausted){
+      inHold = false;
+      disabledUI = true;
+      setPhaseUI('exhausted');
+      updateHoldVisual();
+    }
+  });
 
   socket.on('arming_started', ()=>{ if (exhausted){ disabledUI=false; try{ phaseCopy.textContent='Bank exhausted — press & hold to arm the next round (you can’t play).'; }catch(e){} } setPhaseUI('arming'); roundActive=false; releasedOut=false; disabledUI=false; updateHoldVisual(); stopTimer(); cancelHeartbeat(); notify('Round starting','Press & hold now — all players must hold.'); });
 
