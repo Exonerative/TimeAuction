@@ -1,0 +1,155 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Host · Time-Bank Auction</title>
+<style>
+  body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:20px;}
+  .row{display:flex;gap:20px;flex-wrap:wrap}
+  .card{border:1px solid #ddd;border-radius:14px;padding:16px;box-shadow:0 4px 14px rgba(0,0,0,.06)}
+  .btn{padding:10px 14px;border-radius:10px;border:1px solid #999;background:#fafafa;cursor:pointer}
+  .btn.primary{background:#1a73e8;border-color:#1a73e8;color:#fff}
+  .btn.danger{background:#c62828;border-color:#c62828;color:#fff}
+  .btn.ghost{background:#fff;border-color:#ddd}
+  .big{font-size:24px;font-weight:700}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  table{border-collapse:collapse;width:100%}
+  th,td{border-bottom:1px solid #eee;padding:6px 8px;text-align:left}
+  th{color:#374151}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#eee}
+  .muted{color:#6b7280}
+  .actions button{margin-right:6px}
+  #activeHolds{margin-top:10px}
+  #activeHolds .bar{height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden}
+  #activeHolds .fill{height:6px;background:#10b981}
+
+  .toasts{position:fixed;top:12px;right:12px;display:grid;gap:8px;z-index:9999}
+  .toast{background:#0f172a;color:#e6f0ff;border:1px solid #1e293b;border-radius:12px;padding:10px 12px;box-shadow:0 6px 30px rgba(0,0,0,.25);max-width:320px}
+  .toast.success{border-color:#16a34a}
+  .toast.error{border-color:#dc2626}
+  .btn.applied::after{content:" ✓ Applied";font-weight:700;margin-left:.4rem;opacity:.9}
+
+  .card.game-settings{display:grid;gap:16px;margin-top:16px}
+  .card.game-settings .gs-row{display:grid;gap:8px;padding:12px;border:1px solid #ddd;border-radius:12px}
+  .card.game-settings .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+</style>
+</head>
+<body>
+<div id="toasts" class="toasts" aria-live="polite" aria-atomic="true"></div>
+  <h1>Host · Time-Bank Auction</h1>
+
+  <div class="row">
+    <div class="card" style="flex:1 1 320px;min-width:320px;">
+      <h3>Join / Share</h3>
+      <img src="__QR_DATA__" alt="QR" style="width:180px;height:180px;border:1px solid #ddd;border-radius:8px"/>
+      <p class="mono" id="joinUrl">__JOIN_URL__</p>
+      <div class="row" style="gap:8px">
+        <button id="copyUrl" class="btn">Copy URL</button>
+        <button id="cleanGhosts" class="btn">Clean ghosts</button>
+      </div>
+    </div>
+
+    <div class="card" style="flex:1 1 320px;min-width:320px;">
+      <h3>Settings</h3>
+      <label>Total rounds: <input id="totalRounds" type="number" min="1" value="19"/></label><br/>
+      <label>Time bank per player (minutes): <input id="timeBank" type="number" step="0.1" min="0" value="10"/></label><br/>
+      <label><input id="hostScoreToggle" type="checkbox"/> Show host scoreboard (bank visible)</label><br/>
+      <label><input id="publicScoreToggle" type="checkbox"/> Show public scoreboard (player UI)</label>
+      <div style="margin-top:10px">
+        <button id="startGame" class="btn primary">Start Game</button>
+        <button id="newMatch" class="btn">New Match</button>
+        <button id="stopGame" class="btn danger">Stop</button>
+      </div>
+    </div>
+
+    <div class="card" style="flex:1 1 420px;min-width:380px;">
+      <h3>Round Control</h3>
+      <div>Round: <span id="roundNum">0</span> / <span id="roundTotal">19</span></div>
+      <div>Phase: <span id="phase">idle</span></div>
+      <div>Timer: <span id="roundTimer" class="big mono">00:00.000</span></div>
+
+      <div id="activeHolds"></div>
+
+      <div class="muted" id="armingRow" style="margin-top:6px;display:none">Arming — ready <span id="readyCount">0</span>/<span id="requiredCount">0</span></div>
+      <div style="margin-top:10px">
+        <button id="startRound" class="btn primary">Start Round</button>
+        <button id="endRound" class="btn">End Round</button>
+      </div>
+      <div style="margin-top:14px" id="lastResult"></div>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:18px">
+    <div class="card" style="flex:2 1 540px;min-width:420px;">
+      <h3>Lobby</h3>
+      <div id="lobby"></div>
+    </div>
+
+    <div class="card" style="flex:1 1 420px;min-width:360px;">
+      <h3>History (last 6)</h3>
+      <div id="historyMini"></div>
+      <div class="row" style="margin-top:8px;gap:8px">
+        <a class="btn ghost" href="/history.csv" target="_blank">Download history CSV</a>
+        <a class="btn ghost" href="/scoreboard.csv" target="_blank">Download scoreboard CSV</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:18px">
+    <div class="card" style="flex:1 1 100%;">
+      <h3>Scoreboard (Host)</h3>
+      <div id="hostScoreTable"></div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/public/host.js"></script>
+
+<section class="card game-settings" aria-labelledby="gs-title">
+  <h3 id="gs-title">Game Settings</h3>
+  <button class="btn" id="applyHb">Apply</button>
+  </div>
+
+  <div class="gs-row">
+    <h4>Final Round Boost ⚡</h4>
+    <div id="fStatusChip" class="pill muted" style="margin-bottom:6px">Final Boost: OFF</div>
+    <div id="fPreview" class="muted" style="margin-bottom:8px">Final round award: 🏆 —</div>
+    <label>Enable <select id="fEnable"><option value="0">Off</option><option value="1">On</option></select></label>
+    <label>× <input id="fMult" type="number" value="2" min="1"></label>
+    <label>Override bonuses <select id="fOver"><option value="1">Yes</option><option value="0">No</option></select></label>
+    <button class="btn" id="applyFinal">Apply</button>
+  </div>
+
+  <div class="gs-row">
+    <h4>Bonus Rounds (Gold)</h4>
+    <label>Enable <select id="bEnable"><option value="0">Off</option><option value="1">On</option></select></label>
+    <label>Multiplier × <input id="bMult" type="number" min="2" max="5" value="2"></label>
+    <label>Frequency <select id="bFreq"><option value="off">Off</option><option value="every-3">Every 3</option><option value="every-5">Every 5</option><option value="manual">Manual</option></select></label>
+    <div class="row">
+      <button class="btn subtle" id="bForce">Force next bonus</button>
+      <button class="btn" id="applyBonus">Apply</button>
+    </div>
+  </div>
+
+  <div class="gs-row">
+    <h4>Streak Bonuses</h4>
+    <label>Enable <select id="sEnable"><option value="1">On</option><option value="0">Off</option></select></label>
+    <label>Cap <input id="sCap" type="number" min="1" value="3"></label>
+    <button class="btn" id="applyStreak">Apply</button>
+  </div>
+
+  <div class="gs-row">
+    <h4>Comeback Token</h4>
+    <label>Enable <select id="cEnable"><option value="1">On</option><option value="0">Off</option></select></label>
+    <label>Threshold K <input id="cK" type="number" min="1" value="3"></label>
+    <button class="btn" id="applyComeback">Apply</button>
+  </div>
+
+  <div class="gs-row">
+    <h4>Theme & Spotlight</h4>
+    <label>Theme <select id="theme"><option>default</option><option>gold</option><option>lightning</option><option>ocean</option></select></label>
+    <label>Spotlight <select id="spot"><option value="1">On</option><option value="0">Off</option></select></label>
+    <button class="btn" id="applyTheme">Apply</button>
+  </div>
+</section>
+
+</body></html>

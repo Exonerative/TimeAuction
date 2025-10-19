@@ -1,0 +1,170 @@
+<!doctype html>
+<html><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"/>
+<title>Player · Time-Bank Auction</title>
+<style>
+  :root{ --bg:#0e0f12; --fg:#f2f3f7; --muted:#9aa0a6; --accent:#10b981; --danger:#ef4444; --disabled:#4b5563; }
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;display:flex;align-items:center;justify-content:center}
+  .wrap{max-width:560px;width:100%;padding:20px}
+  .card{background:#12151b;border:1px solid #1f2632;border-radius:20px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  .pad{padding:18px}
+  h1{font-size:18px;margin:0 0 8px}
+  .muted{color:#9aa0a6;font-size:13px}
+  .row{display:flex;gap:10px;align-items:center}
+  input,button{font:inherit}
+  input[type=text]{width:100%;padding:12px 14px;border-radius:12px;border:1px solid #2a3444;background:#0b0e13;color:var(--fg)}
+  .btn{padding:12px 16px;border-radius:14px;border:1px solid #334155;background:#0b0e13;color:var(--fg)}
+  .btn.primary{background:var(--accent);color:#00160e;border-color:#08946d}
+  .center{display:flex;align-items:center;justify-content:center}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+  /* Phase Bar */
+  .phaseBar{display:flex;align-items:center;gap:10px;margin:8px 0 6px}
+  .phaseBadge{font-weight:700;font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid transparent}
+  .phaseCopy{color:#9aa0a6;font-size:13px}
+  .ph-idle{background:#0f172a;color:#e2e8f0;border-color:#1f2937}
+  .ph-arming{background:#f59e0b20;color:#fbbf24;border-color:#f59e0b55}
+  .ph-countdown{background:#fb923c20;color:#fdba74;border-color:#fb923c55}
+  .ph-active{background:#10b98120;color:#34d399;border-color:#10b98155}
+  .ph-ended{background:#6d28d920;color:#c4b5fd;border-color:#6d28d955}
+  .ph-exhausted{background:#4b556320;color:#cbd5e1;border-color:#4b556355}
+
+  /* Circular hold button */
+  .hold.bonus{ background:#231a00; border-color:#d4af37; box-shadow:0 0 0 2px rgba(212,175,55,.25) inset; }
+  .hold{ width:min(72vw, 420px); height:min(72vw, 420px); max-width:420px; max-height:420px; min-width:220px; min-height:220px; border-radius:9999px; margin:18px auto 6px; display:flex; align-items:center; justify-content:center; user-select:none; -webkit-user-select:none; touch-action:manipulation; border:6px solid transparent; transition:transform .08s ease, background .15s ease, border-color .15s ease, opacity .15s ease; }
+  .hold.idle{ background:#1a0f12; border-color:var(--danger); }
+  .hold.pressed{ background:#0f1a14; border-color:var(--accent); }
+  .hold.disabled{ background:#101318; border-color:var(--disabled); opacity:.6; }
+  .hold:active{ transform:scale(.985); }
+  .holdText{ font-size:22px; opacity:.92; text-align:center; }
+  .holdSub{ color:#9aa0a6; font-size:12px; margin-top:6px; text-align:center; }
+
+  /* Countdown overlay */
+  #countdownOverlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.35); }
+  #countdownDigit{ font-size:72px; font-weight:800; color:#f8fafc; text-shadow:0 6px 24px rgba(0,0,0,.45); }
+
+  .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#0b0e13;border:1px solid #2a3444;color:#f8fafc;padding:12px 14px;border-radius:12px}
+
+  /* Public scoreboard */
+  #publicScoreCard{ display:none; margin-top:14px }
+  #publicScoreCard table{ width:100%; border-collapse:collapse }
+  #publicScoreCard th,#publicScoreCard td{ border-bottom:1px solid #1f2632; padding:6px 8px; text-align:left }
+  #publicScoreCard .rank{ width:1%; white-space:nowrap; }
+
+  /* Final modal */
+  #finalModal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6); padding:20px; }
+  #finalCard{ max-width:760px; width:100%; background:#0b0e13; border:1px solid #2a3444; border-radius:18px; box-shadow:0 12px 32px rgba(0,0,0,.45); }
+  #finalCard .pad{ padding:16px 18px; }
+  #finalCard h2{ margin:0 0 6px; }
+  #finalTable{ max-height:60vh; overflow:auto; }
+  #finalTable table{ width:100%; border-collapse:collapse }
+  #finalTable th,#finalTable td{ border-bottom:1px solid #1f2632; padding:6px 8px; text-align:left }
+
+  /* P210 layout guard */
+  :root { --hud-h: 56px; }
+  header,.top,.top-bar,.hud,.status-bar{ position:sticky; top:env(safe-area-inset-top); z-index:100; backdrop-filter:blur(6px); background:rgba(10,15,26,.6) }
+  .public-scoreboard,#publicScoreboard,.scoreboard,[data-role="public-scoreboard"]{ max-height:calc(100dvh - var(--hud-h) - 16px - env(safe-area-inset-top)); overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch }
+
+  /* P213 splash */
+  :root{ --splash-bg: linear-gradient(180deg, #0b1223 0%, #0a0f1a 100%); }
+  .splash{ position:relative; min-height:60dvh; display:flex; align-items:center; justify-content:center; text-align:center; padding:calc(16px + env(safe-area-inset-top)) 16px 12px; }
+  .splash-bg{ position:absolute; inset:0; background:var(--splash-bg); }
+  .splash-inner{ position:relative; z-index:1; max-width:720px; color:#e6f0ff }
+  .splash-title{ margin:.6rem 0 .6rem; font-size:clamp(28px, 6vw, 48px); font-weight:800; letter-spacing:.2px }
+  .splash-cta{ display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap }
+  .btn.primary{ background:#124c3a; color:#001; border:0; padding:.7rem 1rem; border-radius:12px; font-weight:800; cursor:pointer }
+  .link{ color:#93c5fd; text-decoration:underline }
+
+  /* Winner banner */
+  #winnerBanner{position:fixed;inset:0;display:none;align-items:flex-start;justify-content:center;pointer-events:none}
+  #winnerBanner.show{display:flex}
+  #winnerBanner .card{margin-top:16px;background:rgba(2,6,23,.85);border:1px solid #1f2632;border-radius:14px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  #winnerBanner .title{font-weight:800}
+  #winnerBanner .sub{color:#9aa0a6;font-size:13px;margin-top:4px}
+
+
+  /* Heartbeat pulse */
+  @keyframes hbBeat { 0%{transform:scale(1)} 40%{transform:scale(1.03)} 100%{transform:scale(1)} }
+  .hold.hb-beat { animation: hbBeat 180ms ease-out; box-shadow: 0 0 0 0 rgba(16,185,129,.35); }
+
+</style>
+</head>
+<body>
+
+<div class="wrap">
+    <div class="card pad" id="joinCard">
+      <h1>Join or Reconnect</h1>
+      <div class="muted">Enter a name to join, or reconnect with your PIN</div>
+      <div class="row" style="margin-top:10px">
+        <input id="name" type="text" maxlength="24" placeholder="Your name"/>
+        <button id="join" class="btn primary">Join</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <input id="pin" type="text" maxlength="6" placeholder="Your PIN (4–5 digits)"/>
+        <button id="reconnect" class="btn">Reconnect</button>
+      </div>
+    </div>
+
+    <div class="card pad" id="gameCard" style="display:none">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <div class="muted">Player</div>
+          <div id="playerName" style="font-weight:700"></div>
+          <div class="muted" style="font-size:12px">Your PIN: <span id="myPin" class="mono"></span></div>
+        </div>
+        <div style="text-align:right">
+          <div class="muted">Victory tokens</div>
+          <div id="tokenCount" style="font-weight:700;text-align:right">🏆 0</div>
+        </div>
+      </div>
+
+      <!-- Phase Bar -->
+      <div id="phaseBar" class="phaseBar" role="status" aria-live="polite">
+        <span id="phaseBadge" class="phaseBadge ph-idle">Idle</span>
+        <span id="phaseCopy" class="phaseCopy">Waiting for host…</span>
+      </div>
+
+      <!-- Round timer (Active phase) -->
+      <div class="muted">Round timer: <span id="roundTimer" class="mono">00:00.000</span></div>
+
+      <div id="holdArea" class="hold idle" role="button" aria-pressed="false" aria-label="Press and hold">
+        <div><div id="holdText" class="holdText">Press & Hold</div><div id="holdSub" class="holdSub">Release = out (this round)</div></div>
+      </div>
+
+      <div id="exhaustedMsg" class="toast" style="display:none">Your time bank is exhausted. You are spectating.</div>
+      <div id="roundResult" style="margin-top:10px" class="muted"></div>
+
+      <div id="publicScoreCard" class="card pad">
+        <h3>Scoreboard</h3>
+        <div id="publicScoreTable"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="countdownOverlay" class="center"><div id="countdownDigit">5</div></div>
+
+  <!-- Final Modal -->
+  <div id="finalModal" class="center">
+    <div id="finalCard" class="card">
+      <div class="pad">
+        <h2>Final Results</h2>
+        <div id="finalChampion" class="muted">Champion: —</div>
+      </div>
+      <div id="finalTable" class="pad">
+        <div id="finalTableInner"></div>
+      </div>
+      <div class="pad" style="text-align:right">
+        <button id="closeFinal" class="btn">Close</button>
+      </div>
+    
+<div id="winnerBanner" aria-live="polite" aria-atomic="true">
+  <div class="card">
+    <div id="wbTitle" class="title"></div>
+    <div id="wbSub" class="sub"></div>
+  </div>
+</div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/public/player.js"></script>
+</body></html>

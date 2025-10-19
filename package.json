@@ -1,0 +1,17 @@
+{
+  "name": "time-bank-auction",
+  "version": "4.18.0",
+  "description": "Local time-bank auction game (Express + Socket.IO, static HTML build)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.7.5"
+  }
+}
