@@ -302,6 +302,10 @@
   }
 
   socket.on('host_status', (s)=>{
+    if (s && s.ui){
+      if (hostScoreToggle) hostScoreToggle.checked = !!s.ui.showHostScoreboard;
+      if (publicScoreToggle) publicScoreToggle.checked = !!s.ui.showPublicScoreboard;
+    }
     roundNumEl.textContent = s.currentRound; roundTotalEl.textContent = s.settings.totalRounds;
     roundActive = s.roundActive; phaseEl.textContent = s.phase;
     if (roundActive){ activeStart = serverNow() - s.roundElapsedMs; if (window.__syncClock) window.__syncClock(); ensureTimer(); } else { roundTimerEl.textContent = '00:00.000'; }

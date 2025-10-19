@@ -86,7 +86,7 @@ const state = {
   participantsThisRound: new Set(),
   sessionCode: '',
   history: [],
-  ui: { showHostScoreboard:false, showPublicScoreboard:false, theme:'default', spotlight:true },
+  ui: { showHostScoreboard:true, showPublicScoreboard:true, theme:'default', spotlight:true },
   hostSocketId: null,
   activeTicker: null,
   lastActiveHolds: null, // recap of last round
