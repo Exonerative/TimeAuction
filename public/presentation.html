@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Time-Bank Auction · Presentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Rubik', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: radial-gradient(circle at top, #182235 0%, #07090e 55%, #04050a 100%);
+      color: #f4f6fb;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .app {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 32px clamp(24px, 5vw, 64px) 96px;
+      gap: 32px;
+    }
+    header.top {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      align-items: center;
+      gap: 24px;
+    }
+    .round-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .round-meta .phase {
+      font-size: clamp(18px, 2vw, 24px);
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #9bb0ff;
+    }
+    .round-meta .round-number {
+      font-size: clamp(32px, 5vw, 56px);
+      font-weight: 700;
+    }
+    .timer {
+      font-size: clamp(64px, 12vw, 140px);
+      font-weight: 700;
+      text-align: center;
+      background: linear-gradient(90deg, #9bb0ff, #6ee7ff);
+      -webkit-background-clip: text;
+      color: transparent;
+      line-height: 1;
+      text-shadow: 0 0 25px rgba(110, 231, 255, 0.25);
+    }
+    .chips {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .chip {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-weight: 500;
+      font-size: 16px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .chip .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #6ee7ff;
+      display: inline-block;
+    }
+    .chip.muted {
+      color: rgba(244, 246, 251, 0.6);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+    main.grid {
+      display: grid;
+      gap: 28px;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+      align-items: start;
+    }
+    @media (max-width: 960px) {
+      main.grid {
+        grid-template-columns: 1fr;
+      }
+      header.top {
+        grid-template-columns: 1fr;
+        text-align: center;
+      }
+      .round-meta { align-items: center; }
+      .chips { justify-content: center; }
+    }
+    section.panel {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 24px;
+      padding: 24px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+    }
+    section.panel h2 {
+      margin: 0 0 16px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.74);
+    }
+    table.leaderboard {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 18px;
+    }
+    table.leaderboard thead th {
+      text-align: left;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.64);
+      padding-bottom: 10px;
+    }
+    table.leaderboard tbody td {
+      padding: 12px 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    table.leaderboard tbody tr:first-child td {
+      border-top: none;
+    }
+    table.leaderboard tbody td.rank {
+      width: 48px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+    table.leaderboard tbody td.score {
+      font-weight: 600;
+      color: #fff;
+    }
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .history-entry {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 10px;
+    }
+    .history-entry:last-child {
+      border-bottom: none;
+    }
+    .history-entry strong {
+      font-size: 20px;
+    }
+    .history-entry .winner {
+      font-weight: 500;
+      color: #9bb0ff;
+    }
+    .history-empty {
+      color: rgba(255, 255, 255, 0.5);
+      font-style: italic;
+    }
+    .active-summary {
+      margin-top: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .active-summary h3 {
+      margin: 0;
+      font-size: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: rgba(255, 255, 255, 0.62);
+    }
+    .active-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .active-card .name {
+      font-weight: 600;
+      font-size: 18px;
+    }
+    .active-card .meta {
+      display: flex;
+      gap: 16px;
+      align-items: baseline;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(255, 255, 255, 0.6);
+    }
+    .marquee {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 20px 32px;
+      background: linear-gradient(120deg, rgba(155, 176, 255, 0.95), rgba(110, 231, 255, 0.95));
+      color: #04111a;
+      font-weight: 700;
+      font-size: clamp(20px, 3vw, 32px);
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      display: flex;
+      justify-content: center;
+      transform: translateY(100%);
+      opacity: 0;
+      transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.6s ease;
+      z-index: 20;
+    }
+    .marquee.show {
+      transform: translateY(0%);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="round-meta">
+        <div class="phase" id="phaseLabel">Idle</div>
+        <div class="round-number">Round <span id="roundNumber">0</span><span class="total">/<span id="roundTotal">0</span></span></div>
+      </div>
+      <div class="timer" id="mainTimer">00:00</div>
+      <div class="chips">
+        <span class="chip" id="roundsLeftChip"><span class="dot"></span><span id="roundsLeftValue">0</span> rounds left</span>
+        <span class="chip muted" id="statusChip">Waiting for host…</span>
+      </div>
+    </header>
+    <main class="grid">
+      <section class="panel">
+        <h2>Leaderboard</h2>
+        <table class="leaderboard">
+          <thead>
+            <tr><th>#</th><th>Player</th><th>🏆 Tokens</th><th>Rounds Since Win</th></tr>
+          </thead>
+          <tbody id="leaderboardBody">
+            <tr><td colspan="4" class="history-empty">No players yet</td></tr>
+          </tbody>
+        </table>
+      </section>
+      <section class="panel">
+        <h2>Latest Rounds</h2>
+        <div class="history-list" id="historyList">
+          <div class="history-empty">No rounds played yet.</div>
+        </div>
+        <div class="active-summary" id="activeSummary" hidden>
+          <h3 id="activeTitle">Current Round</h3>
+          <div id="activeCards"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div class="marquee" id="winnerMarquee">Winner</div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/public/presentation.js"></script>
+</body>
+</html>

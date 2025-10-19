@@ -11,6 +11,7 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+const presentationSockets = new Set();
 
 // Broadcast server time to clients for countdown sync
 setInterval(()=>{ try{ io.emit('server_now', { now: Date.now() }); }catch(e){} }, 1000);
@@ -163,6 +164,79 @@ function buildPublicScoreboard(){
   return rows.map(({name,tokens,roundsSinceWin,rank})=>({ name, tokens, roundsSinceWin, rank }));
 }
 
+function buildPresentationActiveSummary(){
+  if (state.phase !== 'active') return null;
+  const ts = now();
+  const rows = Array.from(state.participantsThisRound || []).map(id=>{
+    const p = state.players[id];
+    if (!p) return null;
+    const base = state.roundHolds[id] || 0;
+    const extra = (p.inRoundHold && p.holdStartTs) ? clamp(ts - p.holdStartTs, 0, p.timeRemainingMs || 0) : 0;
+    const heldMs = base + extra;
+    let status = 'locked';
+    if (p.exhausted) status = 'exhausted';
+    else if (p.inRoundHold) status = 'holding';
+    else if (state.outThisRound.has(id)) status = 'out';
+    return { name: p.name, heldMs, status };
+  }).filter(Boolean).sort((a,b)=> (b.heldMs||0) - (a.heldMs||0));
+  return { round: state.currentRound, rows };
+}
+
+function buildPresentationRecap(){
+  if (!state.lastActiveHolds) return null;
+  return {
+    round: state.lastActiveHolds.round,
+    rows: (state.lastActiveHolds.rows || []).map(r=>({ name: r.name, heldMs: r.msHeldThisRound, status: r.status }))
+  };
+}
+
+function latestHistoryEntry(){
+  if (!state.history.length) return null;
+  const h = state.history[state.history.length - 1];
+  return {
+    round: h.round,
+    winnerName: h.winnerName,
+    winnerMs: h.winnerMs,
+    winnerTokens: h.winnerTokens,
+    ts: h.ts
+  };
+}
+
+function sanitizeHistoryList(limit=10){
+  const start = Math.max(0, state.history.length - limit);
+  return state.history.slice(start).map(h=>({
+    round: h.round,
+    winnerName: h.winnerName,
+    winnerMs: h.winnerMs,
+    winnerTokens: h.winnerTokens,
+    ts: h.ts
+  }));
+}
+
+function emitPresentationState(targetSocket=null){
+  const activeSummary = buildPresentationActiveSummary();
+  const recap = activeSummary ? null : buildPresentationRecap();
+  const payload = {
+    currentRound: state.currentRound,
+    totalRounds: state.settings.totalRounds,
+    roundsRemaining: Math.max(0, state.settings.totalRounds - state.currentRound),
+    phase: state.phase,
+    roundElapsedMs: state.roundActive ? (now() - state.roundStartTs) : 0,
+    countdown: { startTs: state.countdownStartTs, durationMs: state.countdownMs, lockedCount: state.lockedParticipants.size },
+    countdownPending: state.phase === 'countdown',
+    scoreboard: { rows: buildPublicScoreboard() },
+    history: sanitizeHistoryList(12),
+    latestHistory: latestHistoryEntry(),
+    activeSummary,
+    recapSummary: recap,
+  };
+  const targets = targetSocket ? [targetSocket] : Array.from(presentationSockets);
+  targets.forEach(sock=>{
+    if (!sock || !sock.connected) return;
+    try{ sock.emit('presentation_state', payload); }catch(e){}
+  });
+}
+
 function computeSoleChampion(){
   const rows = Object.values(state.players).filter(p=>p.joined).map(p=>({
     id: p.id,
@@ -178,8 +252,9 @@ function computeSoleChampion(){
 }
 
 function broadcastPublicScoreboard(){
-  if (!state.ui.showPublicScoreboard) return;
+  if (!state.ui.showPublicScoreboard){ emitPresentationState(); return; }
   io.emit('scoreboard_update', { rows: buildPublicScoreboard() });
+  emitPresentationState();
 }
 
 // --------------------------- Host & Lobby ---------------------------
@@ -217,6 +292,7 @@ function emitHostStatus(){
   }
   if (state.ui.showHostScoreboard){ payload.scoreboardHost = buildHostScoreboard(); }
   io.to(state.hostSocketId).emit('host_status', payload);
+  emitPresentationState();
 }
 function startActiveTicker(){
   if (state.activeTicker) return;
@@ -233,7 +309,7 @@ function beginArming(){
   state.readyHoldersAll = new Set(); state.lockedParticipants = new Set(); state.outThisRound = new Set();
   state.requiredPressSet = new Set(Object.values(state.players).filter(p=>p.joined).map(p=>p.id));
   io.emit('arming_started', { requiredCount: state.requiredPressSet.size, names: Object.values(state.players).filter(p=>p.joined).map(p=>({id:p.id,name:p.name,exhausted:p.exhausted})) });
-  emitHostStatus(); broadcastPublicScoreboard();
+  emitHostStatus(); broadcastPublicScoreboard(); emitPresentationState();
 }
 let allHoldDebounce = null;
 function checkAllHoldGate(){
@@ -251,7 +327,7 @@ function beginCountdown(){
   const _br = isBonusRound(state.settings, state.currentRound);
   if (_br && _br.active){ io.emit('bonus_round_armed', { round: state.currentRound, value: _br.value }); }
   if (state.currentRound === state.settings.totalRounds){ io.emit('final_round_armed', { round: state.currentRound, tokens: roundTokenValue(state.currentRound) }); }
-  emitHostStatus(); setTimeout(()=>{ if (state.phase==='countdown') beginActive(); }, state.countdownMs);
+  emitHostStatus(); emitPresentationState(); setTimeout(()=>{ if (state.phase==='countdown') beginActive(); }, state.countdownMs);
 }
 function scheduleExhaustTimeout(p){
   if (p.autoExhaustTimeout){ clearTimeout(p.autoExhaustTimeout); p.autoExhaustTimeout=null; }
@@ -285,7 +361,7 @@ function beginActive(){
   const _bonusRS = isBonusRound(state.settings, state.currentRound);
   io.emit('round_started', { round: state.currentRound, startTs: state.roundStartTs, elapsedMs: 0, bonusActive: !!_bonusRS.active, bonusValue: _bonusRS.value });
   startActiveTicker();
-  emitHostStatus(); broadcastPublicScoreboard();
+  emitHostStatus(); broadcastPublicScoreboard(); emitPresentationState();
 }
 function endRound(reason='ended'){
   const ts = now();
@@ -326,7 +402,7 @@ function endRound(reason='ended'){
   state.roundActive = false; state.phase = 'idle'; state.countdownStartTs = 0;
   stopActiveTicker();
   clearInRoundFlags(); resetRoundSets();
-  emitHostStatus(); broadcastLobby(); broadcastPublicScoreboard();
+  emitHostStatus(); broadcastLobby(); broadcastPublicScoreboard(); emitPresentationState();
 
   if (state.currentRound >= state.settings.totalRounds){
     const eliminated = computeEliminations();
@@ -351,14 +427,14 @@ function startGame(totalRounds, timeBankMinutes){
   state.settings.timeBankMinutes = Number(timeBankMinutes) || 10;
   state.started = true; state.currentRound = 0; state.roundActive = false; state.phase = 'idle';
   state.sessionCode = genSessionCode(); state.history = []; resetRoundSets(); state.lastActiveHolds = null;
-  emitHostStatus(); broadcastLobby(); broadcastPublicScoreboard();
+  emitHostStatus(); broadcastLobby(); broadcastPublicScoreboard(); emitPresentationState();
 }
 function newMatch(){ startGame(state.settings.totalRounds, state.settings.timeBankMinutes); }
 function stopGame(){
   state.started = false; state.currentRound = 0; state.roundActive = false; state.phase = 'idle'; state.countdownStartTs = 0;
   stopActiveTicker();
   clearInRoundFlags(); resetRoundSets(); state.lastActiveHolds = null;
-  emitHostStatus(); broadcastLobby(); broadcastPublicScoreboard();
+  emitHostStatus(); broadcastLobby(); broadcastPublicScoreboard(); emitPresentationState();
 }
 
 // --------------------------- Routes ---------------------------
@@ -397,6 +473,10 @@ app.get('/host', async (req,res)=>{
 });
 app.get('/player', (req,res)=>{
   const html = fs.readFileSync(path.join(__dirname, 'public', 'player.html'), 'utf8');
+  res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.send(html);
+});
+app.get('/presentation', (req,res)=>{
+  const html = fs.readFileSync(path.join(__dirname, 'public', 'presentation.html'), 'utf8');
   res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.send(html);
 });
 
@@ -582,6 +662,15 @@ io.on('connection', (socket) => {
       io.to(socket.id).emit('host_action_ack', { ok:true, action:'apply_spotlight', detail:'Spotlight ' + (state.ui.spotlight?'on':'off'), ts: now() });
     });
 
+    return;
+  }
+
+  if (role === 'presentation'){
+    presentationSockets.add(socket);
+    emitPresentationState(socket);
+    socket.on('disconnect', ()=>{
+      presentationSockets.delete(socket);
+    });
     return;
   }
 
