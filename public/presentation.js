@@ -13,6 +13,7 @@
   const timerLabel = document.getElementById('timerLabel');
   const timerValue = document.getElementById('timerValue');
   const timerSub = document.getElementById('timerSub');
+  const timerCard = document.querySelector('.timer-card');
   const statusBanner = document.getElementById('statusBanner');
   const nextReadySummary = document.getElementById('nextReadySummary');
   const nextReadyCountdown = document.getElementById('nextReadyCountdown');
@@ -21,10 +22,12 @@
   const historyList = document.getElementById('historyList');
   const historyEmpty = document.getElementById('historyEmpty');
 
-  const MAX_HISTORY = 8;
+  const MAX_HISTORY = 4;
+  const MAX_SCOREBOARD_ROWS = 5;
   let latestState = { scoreboard: [], history: [], scoreboardVisible: true };
   let timerInterval = null;
   let statusHoldUntil = 0;
+  let currentTimerPhaseClass = '';
 
   function pad(value){ return String(value).padStart(2, '0'); }
   function formatClock(ms){
@@ -65,10 +68,15 @@
       statusHoldUntil = 0;
       statusBanner.textContent = computeDefaultStatus();
       statusBanner.classList.remove('hidden');
+      statusBanner.classList.remove('flash');
       return;
     }
     statusBanner.textContent = text;
     statusBanner.classList.remove('hidden');
+    statusBanner.classList.remove('flash');
+    void statusBanner.offsetWidth; // restart animation
+    statusBanner.classList.add('flash');
+    setTimeout(()=> statusBanner.classList.remove('flash'), 1600);
     if (timerInterval == null) startTimer();
     if (!ttlMs || ttlMs <= 0){
       statusHoldUntil = 0;
@@ -88,6 +96,18 @@
     const text = computeDefaultStatus();
     statusBanner.textContent = text;
     statusBanner.classList.toggle('hidden', !text);
+    statusBanner.classList.remove('flash');
+  }
+
+  function applyTimerPhaseClass(phase){
+    if (!timerCard) return;
+    const next = phase ? `phase-${phase}` : 'phase-idle';
+    if (currentTimerPhaseClass === next) return;
+    if (currentTimerPhaseClass){
+      timerCard.classList.remove(currentTimerPhaseClass);
+    }
+    timerCard.classList.add(next);
+    currentTimerPhaseClass = next;
   }
 
   function startTimer(){
@@ -106,22 +126,24 @@
     let mainValue = '00:00';
     let sub = '—';
     const state = latestState || {};
+    const phase = state.phase || 'idle';
+    applyTimerPhaseClass(state.started ? phase : 'idle');
     if (!state.started){
       mainLabel = 'Awaiting start';
       mainValue = '00:00';
       sub = 'Waiting for host';
-    } else if (state.phase === 'countdown' && state.countdown){
+    } else if (phase === 'countdown' && state.countdown){
       const end = (state.countdown.startTs||0) + (state.countdown.durationMs||0);
       const remaining = Math.max(0, end - now);
       mainLabel = 'Round countdown';
       mainValue = formatClock(remaining);
       sub = `Round ${Math.max(state.currentRound || 1, 1)} begins soon`;
-    } else if (state.phase === 'active' && state.roundTimer){
+    } else if (phase === 'active' && state.roundTimer){
       const elapsed = Math.max(0, now - (state.roundTimer.startTs||0));
       mainLabel = 'Round in progress';
       mainValue = formatClock(elapsed);
       sub = `Round ${state.currentRound || '?'} active`;
-    } else if (state.phase === 'arming'){
+    } else if (phase === 'arming'){
       mainLabel = 'Arming phase';
       mainValue = '00:00';
       sub = `Preparing round ${Math.max(state.currentRound || 1, 1)}`;
@@ -142,9 +164,11 @@
       if (nextReadyCountdown){
         nextReadyCountdown.style.display = 'inline-flex';
         nextReadyCountdown.textContent = `${Math.ceil(remaining/1000)}s`;
+        nextReadyCountdown.classList.add('pulsing');
       }
     } else if (nextReadyCountdown){
       nextReadyCountdown.style.display = 'none';
+      nextReadyCountdown.classList.remove('pulsing');
     }
 
     if (!statusHoldUntil || Date.now() >= statusHoldUntil){
@@ -192,15 +216,18 @@
     if (!visible){
       scoreboardEmpty.textContent = 'Scoreboard hidden';
       scoreboardEmpty.style.display = 'block';
+      scoreboardList.style.display = 'none';
       return;
     }
     if (!rows.length){
       scoreboardEmpty.textContent = 'No standings yet';
       scoreboardEmpty.style.display = 'block';
+      scoreboardList.style.display = 'none';
       return;
     }
     scoreboardEmpty.style.display = 'none';
-    rows.slice(0, 10).forEach((row)=>{
+    scoreboardList.style.display = rows.length ? 'grid' : 'none';
+    rows.slice(0, MAX_SCOREBOARD_ROWS).forEach((row)=>{
       const li = document.createElement('li');
       li.className = 'scoreboard-row';
       const rank = document.createElement('span');
@@ -216,6 +243,8 @@
       li.appendChild(name);
       li.appendChild(tokens);
       scoreboardList.appendChild(li);
+      li.classList.add('enter');
+      setTimeout(()=> li.classList.remove('enter'), 1700);
     });
   }
 
@@ -225,9 +254,11 @@
     const items = Array.isArray(latestState.history) ? latestState.history.slice(0, MAX_HISTORY) : [];
     if (!items.length){
       historyEmpty.style.display = 'block';
+      historyList.style.display = 'none';
       return;
     }
     historyEmpty.style.display = 'none';
+    historyList.style.display = 'flex';
     items.forEach((entry)=>{
       const li = document.createElement('li');
       li.className = 'history-item';
@@ -254,6 +285,8 @@
       details.appendChild(meta);
       li.appendChild(details);
       historyList.appendChild(li);
+      li.classList.add('enter');
+      setTimeout(()=> li.classList.remove('enter'), 1800);
     });
   }
 
