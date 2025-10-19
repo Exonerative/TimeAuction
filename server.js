@@ -12,6 +12,8 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+const NO_HOLD_TIMEOUT_MS = 10000;
+
 // Broadcast server time to clients for countdown sync
 setInterval(()=>{ try{ io.emit('server_now', { now: Date.now() }); }catch(e){} }, 1000);
 
@@ -92,9 +94,29 @@ const state = {
   lastActiveHolds: null, // recap of last round
   currentRoundBonus: null,
   nextRound: { requirement: 0, countdownMs: 3000, countdownStartTs: 0, countdownTimer: null },
+  noHoldTimer: null,
 };
 
 const presentationSockets = new Set();
+
+function clearNoHoldTimer(){
+  if (state.noHoldTimer){
+    clearTimeout(state.noHoldTimer);
+    state.noHoldTimer = null;
+  }
+}
+function startNoHoldTimer(){
+  clearNoHoldTimer();
+  const someoneHolding = Object.values(state.players).some(p => p && p.inRoundHold && state.lockedParticipants.has(p.id) && !state.outThisRound.has(p.id));
+  if (someoneHolding) return;
+  state.noHoldTimer = setTimeout(()=>{
+    state.noHoldTimer = null;
+    if (!state.roundActive || state.phase !== 'active') return;
+    if (anyPlayerHeldThisRound()) return;
+    try{ io.emit('round_no_hold', { round: state.currentRound }); }catch(e){}
+    endRound('no-hold');
+  }, NO_HOLD_TIMEOUT_MS);
+}
 
 function resetRoundSets(){
   state.roundHolds = {};
@@ -105,6 +127,7 @@ function resetRoundSets(){
   state.participantsThisRound = new Set();
 }
 function clearInRoundFlags(){
+  clearNoHoldTimer();
   Object.values(state.players).forEach(p => {
     p.inRoundHold = false; p.holdStartTs = null;
     if (p.autoExhaustTimeout){ clearTimeout(p.autoExhaustTimeout); p.autoExhaustTimeout = null; }
@@ -276,6 +299,7 @@ function buildPresentationHistory(){
     winnerTokens: h.winnerTokens,
     winnerMs: h.winnerMs,
     ts: h.ts,
+    reason: h.reason,
   }));
 }
 
@@ -450,6 +474,7 @@ function beginActive(){
   const _bonusRS = isBonusRound(state.settings, state.currentRound);
   state.currentRoundBonus = { active: !!_bonusRS?.active, value: _bonusRS?.value || 1 };
   io.emit('round_started', { round: state.currentRound, startTs: state.roundStartTs, elapsedMs: 0, bonusActive: !!_bonusRS.active, bonusValue: _bonusRS.value });
+  startNoHoldTimer();
   startActiveTicker();
   emitHostStatus(); broadcastPublicScoreboard();
 }
@@ -469,6 +494,7 @@ function advanceToNextRound(trigger='host'){
 }
 function endRound(reason='ended'){
   const ts = now();
+  clearNoHoldTimer();
   if (state.roundActive){
     Object.values(state.players).forEach(p=>{
       if (p.inRoundHold && p.holdStartTs){
@@ -489,10 +515,10 @@ function endRound(reason='ended'){
     w.tokens += roundTokenValue(state.currentRound);
     w.lastVictoryRound = state.currentRound;
     resultPayload = { round: state.currentRound, winner: w.name, winnerMs, winnerTokens: w.tokens, finalRound: (state.currentRound === state.settings.totalRounds) };
-    historyEntry = { round: state.currentRound, winnerId, winnerName: w.name, winnerMs, winnerTokens: w.tokens, ts: now() };
+    historyEntry = { round: state.currentRound, winnerId, winnerName: w.name, winnerMs, winnerTokens: w.tokens, ts: now(), reason };
   } else {
     resultPayload = { round: state.currentRound, winner: null, winnerMs: 0, winnerTokens: 0, finalRound: (state.currentRound === state.settings.totalRounds) };
-    historyEntry = { round: state.currentRound, winnerId: null, winnerName: null, winnerMs: 0, winnerTokens: 0, ts: now() };
+    historyEntry = { round: state.currentRound, winnerId: null, winnerName: null, winnerMs: 0, winnerTokens: 0, ts: now(), reason };
   }
 
   const totalRounds = state.settings.totalRounds;
@@ -506,6 +532,7 @@ function endRound(reason='ended'){
   resultPayload.leaderName = leaderRow ? leaderRow.name : null;
   resultPayload.leaderTokens = leaderRow ? leaderRow.tokens : null;
   if (bonusMeta.active){ resultPayload.bonusValue = bonusMeta.value; }
+  resultPayload.reason = reason;
 
   io.emit('round_result', resultPayload);
   state.history.push(historyEntry);
@@ -586,8 +613,8 @@ app.get('/', (req,res)=> res.redirect('/host'));
 app.get('/history.csv', (req,res)=>{
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="history-${state.sessionCode||'session'}.csv"`);
-  const rows = [ ['sessionCode','round','winnerName','winnerMs','winnerMs_fmt','winnerTokens','timestamp'] ];
-  for (const h of state.history){ rows.push([state.sessionCode, h.round, h.winnerName||'', String(h.winnerMs), msToHMS(h.winnerMs), String(h.winnerTokens), new Date(h.ts).toISOString()]); }
+  const rows = [ ['sessionCode','round','winnerName','winnerMs','winnerMs_fmt','winnerTokens','reason','timestamp'] ];
+  for (const h of state.history){ rows.push([state.sessionCode, h.round, h.winnerName||'', String(h.winnerMs), msToHMS(h.winnerMs), String(h.winnerTokens), h.reason || '', new Date(h.ts).toISOString()]); }
   const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   res.send(csv);
 });
@@ -929,6 +956,7 @@ io.on('connection', (socket) => {
     }
 
     if (p.inRoundHold) return;
+    if (state.phase === 'active'){ clearNoHoldTimer(); }
     p.inRoundHold = true;
 
     if (state.phase==='active'){ p.holdStartTs = now(); scheduleExhaustTimeout(p); }

@@ -301,7 +301,7 @@
   })();
 
   let activeStart = 0; let roundActive = false; let timerInt = null;
-  function fmt(ms){ const m=Math.floor(ms/60000), s=Math.floor((ms%60000)/1000), x=ms%1000; return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+'.'+String(x).padStart(3,'0'); }
+  function fmt(ms){ if (!Number.isFinite(ms)) return '—'; const m=Math.floor(ms/60000), s=Math.floor((ms%60000)/1000), x=ms%1000; return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+'.'+String(x).padStart(3,'0'); }
   function tick(){ if (!roundActive){ roundTimerEl.textContent='00:00.000'; return; } roundTimerEl.textContent = fmt(serverNow() - activeStart); }
   function ensureTimer(){ if (timerInt) return; timerInt = setInterval(tick,50); }
 
@@ -406,7 +406,15 @@
       }
     }
 
-    const hrows = (s.history||[]).map(h=>'<tr><td>#'+h.round+'</td><td>'+(h.winnerName || '—')+'</td><td>'+fmt(h.winnerMs)+'</td><td>🏆 '+(h.winnerTokens||0)+'</td></tr>').join('');
+    const hrows = (s.history||[]).map(h=>{
+      const reason = h && h.reason;
+      const isNoHold = reason === 'no-hold';
+      const winner = isNoHold ? 'Nobody held' : (h.winnerName || '—');
+      const held = isNoHold ? '—' : fmt(h.winnerMs);
+      const tokens = isNoHold ? '—' : ('🏆 ' + (h.winnerTokens||0));
+      const cls = isNoHold ? ' class="no-hold"' : '';
+      return `<tr${cls}><td>#${h.round}</td><td>${winner}</td><td>${held}</td><td>${tokens}</td></tr>`;
+    }).join('');
     historyMiniEl.innerHTML = '<table><thead><tr><th>Round</th><th>Winner</th><th>Held</th><th>Winner 🏆</th></tr></thead><tbody>'+ (hrows || '<tr><td colspan=4 class="muted">No rounds yet</td></tr>') +'</tbody></table>';
 
     if (s.scoreboardHost){ renderHostScore(s.scoreboardHost); } else { hostScoreTable.innerHTML = '<div class="muted">(Toggle "Show host scoreboard" to display details)</div>'; }
@@ -427,6 +435,12 @@
       pendingButtons.delete(action);
       if (ok) markApplied(btn);
       else clearAppliedState(btn);
+    }
+  });
+
+  socket.on('round_result', (info={})=>{
+    if (info && info.reason === 'no-hold'){
+      showToast(`Round ${info.round != null ? info.round : '?'}: Nobody held!`, 'error');
     }
   });
 
