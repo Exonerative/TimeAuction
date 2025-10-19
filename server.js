@@ -265,6 +265,21 @@ function computeSoleChampion(){
   return rows[0];
 }
 
+function computeLeaderSummary(){
+  const players = Object.values(state.players).filter(p=>p.joined);
+  if (!players.length) return null;
+  let maxTokens = Number.NEGATIVE_INFINITY;
+  for (const p of players){
+    const tok = Number(p.tokens) || 0;
+    if (tok > maxTokens){ maxTokens = tok; }
+  }
+  if (!Number.isFinite(maxTokens)) maxTokens = 0;
+  const leaders = players.filter(p => (Number(p.tokens) || 0) === maxTokens);
+  leaders.sort((a,b)=> String(a.name||'').localeCompare(String(b.name||'')));
+  const top = leaders[0] || null;
+  return top ? { id: top.id, name: top.name, tokens: maxTokens } : null;
+}
+
 function broadcastPublicScoreboard(){
   if (!state.ui.showPublicScoreboard) return;
   io.emit('scoreboard_update', { rows: buildPublicScoreboard() });
@@ -420,14 +435,46 @@ function endRound(reason='ended'){
   }
   let winnerId = null, winnerMs = 0;
   for (const [pid, held] of Object.entries(state.roundHolds)){ if ((held||0) > winnerMs){ winnerMs = held; winnerId = pid; } }
+  const totalRounds = state.settings.totalRounds;
+  const bonusMeta = isBonusRound(state.settings, state.currentRound);
   if (winnerId && state.players[winnerId]){
     const w = state.players[winnerId];
     w.tokens += roundTokenValue(state.currentRound);
     w.lastVictoryRound = state.currentRound;
-    io.emit('round_result', { round: state.currentRound, winner: w.name, winnerMs, winnerTokens: w.tokens, finalRound: (state.currentRound === state.settings.totalRounds) });
+    const leaderSummary = computeLeaderSummary();
+    const baseResult = {
+      round: state.currentRound,
+      finalRound: (state.currentRound === totalRounds),
+      totalRounds,
+      roundsLeft: Math.max(0, totalRounds - state.currentRound),
+      leaderName: leaderSummary?.name ?? null,
+      leaderTokens: leaderSummary?.tokens ?? null,
+    };
+    if (bonusMeta && bonusMeta.active){ baseResult.bonusValue = bonusMeta.value; }
+    io.emit('round_result', Object.assign({}, baseResult, {
+      winner: w.name,
+      winnerId,
+      winnerMs,
+      winnerTokens: w.tokens,
+    }));
     state.history.push({ round: state.currentRound, winnerId, winnerName: w.name, winnerMs, winnerTokens: w.tokens, ts: now() });
   } else {
-    io.emit('round_result', { round: state.currentRound, winner: null, winnerMs: 0, winnerTokens: 0, finalRound: (state.currentRound === state.settings.totalRounds) });
+    const leaderSummary = computeLeaderSummary();
+    const baseResult = {
+      round: state.currentRound,
+      finalRound: (state.currentRound === totalRounds),
+      totalRounds,
+      roundsLeft: Math.max(0, totalRounds - state.currentRound),
+      leaderName: leaderSummary?.name ?? null,
+      leaderTokens: leaderSummary?.tokens ?? null,
+    };
+    if (bonusMeta && bonusMeta.active){ baseResult.bonusValue = bonusMeta.value; }
+    io.emit('round_result', Object.assign({}, baseResult, {
+      winner: null,
+      winnerId: null,
+      winnerMs: 0,
+      winnerTokens: 0,
+    }));
     state.history.push({ round: state.currentRound, winnerId: null, winnerName: null, winnerMs: 0, winnerTokens: 0, ts: now() });
   }
   if (state.history.length > 500) state.history.splice(0, state.history.length - 500);
