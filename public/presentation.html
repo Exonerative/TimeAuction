@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Presentation · Time-Bank Auction</title>
+  <style>
+    :root{
+      color-scheme: dark;
+      --bg:#0f172a;
+      --surface:#111c34;
+      --surface-alt:#0b1220;
+      --text:#f8fafc;
+      --muted:#94a3b8;
+      --accent:#38bdf8;
+      --chip-bg:rgba(148,163,184,0.16);
+      font-family:"Inter",system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    }
+    *{box-sizing:border-box;}
+    body{margin:0;background:var(--bg);color:var(--text);min-height:100vh;display:flex;justify-content:center;padding:24px;}
+    .layout{width:100%;max-width:1400px;display:flex;flex-direction:column;gap:24px;}
+    header{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start;justify-content:space-between;}
+    .phase-chip{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border-radius:999px;padding:8px 16px;font-size:1.1rem;font-weight:600;text-transform:capitalize;border:1px solid rgba(56,189,248,0.35);}
+    .round-info{font-size:1.15rem;color:var(--muted);margin-top:6px;}
+    .status-banner{min-height:48px;padding:12px 16px;border-radius:16px;background:var(--surface);border:1px solid rgba(56,189,248,0.35);font-weight:600;font-size:1rem;color:var(--text);display:flex;align-items:center;justify-content:center;text-align:center;}
+    .status-banner.hidden{opacity:0.5;font-weight:500;color:var(--muted);}
+    .next-ready{display:flex;flex-direction:column;gap:6px;align-items:flex-end;text-align:right;}
+    .next-ready strong{font-size:1.05rem;}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--chip-bg);color:var(--accent);font-weight:600;font-size:0.95rem;}
+    main{display:grid;gap:24px;grid-template-columns:2fr 1fr;grid-template-areas:"timer leaderboard" "timer history";}
+    .timer-card{grid-area:timer;background:linear-gradient(160deg,rgba(56,189,248,0.18),rgba(59,130,246,0.18));border-radius:32px;padding:40px 32px;display:flex;flex-direction:column;gap:12px;border:1px solid rgba(56,189,248,0.25);box-shadow:0 20px 60px rgba(15,23,42,0.35);}
+    .timer-label{font-size:1.2rem;color:var(--muted);}
+    .timer-value{font-size:5rem;font-weight:800;letter-spacing:0.08em;}
+    .timer-sub{font-size:1.1rem;color:var(--muted);min-height:1.2em;}
+    section.card{background:var(--surface);border-radius:24px;padding:24px;border:1px solid rgba(148,163,184,0.25);display:flex;flex-direction:column;gap:16px;min-height:0;}
+    .card-title{font-size:1.4rem;font-weight:700;}
+    .scoreboard-list{list-style:none;padding:0;margin:0;display:grid;gap:12px;}
+    .scoreboard-row{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-radius:16px;background:var(--surface-alt);border:1px solid rgba(148,163,184,0.2);}
+    .scoreboard-row .rank{font-size:1.1rem;font-weight:700;color:var(--accent);}
+    .scoreboard-row .name{font-size:1.1rem;font-weight:600;}
+    .scoreboard-row .tokens{font-size:1.2rem;font-weight:700;}
+    .history-list{list-style:none;padding:0;margin:0;display:grid;gap:14px;}
+    .history-item{padding:14px 16px;border-radius:16px;background:var(--surface-alt);border:1px solid rgba(148,163,184,0.2);display:flex;justify-content:space-between;gap:16px;align-items:center;}
+    .history-item .details{display:flex;flex-direction:column;gap:4px;}
+    .history-item .round{font-weight:700;color:var(--accent);}
+    .history-item .winner{font-size:1.1rem;font-weight:600;}
+    .history-item .meta{font-size:0.95rem;color:var(--muted);}
+    .empty-note{color:var(--muted);font-style:italic;}
+    @media (max-width:1100px){
+      main{grid-template-columns:1fr;grid-template-areas:"timer" "leaderboard" "history";}
+      .timer-card{padding:32px 24px;}
+    }
+    @media (max-width:640px){
+      body{padding:16px;}
+      .timer-value{font-size:3.4rem;}
+      .scoreboard-row{flex-direction:column;align-items:flex-start;gap:8px;}
+      .history-item{flex-direction:column;align-items:flex-start;}
+      header{flex-direction:column;align-items:flex-start;}
+      .next-ready{align-items:flex-start;text-align:left;}
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <div>
+        <div id="phaseLabel" class="phase-chip" aria-live="polite">Idle</div>
+        <div class="round-info" id="roundInfo">Round 0 / 0</div>
+      </div>
+      <div class="next-ready">
+        <div id="statusBanner" class="status-banner hidden" aria-live="polite">Waiting for host…</div>
+        <strong id="nextReadySummary">Next round queue inactive</strong>
+        <div class="chip" id="nextReadyCountdown" style="display:none">00s</div>
+      </div>
+    </header>
+    <main>
+      <section class="timer-card" aria-live="polite">
+        <div class="timer-label" id="timerLabel">Timer</div>
+        <div class="timer-value" id="timerValue">00:00</div>
+        <div class="timer-sub" id="timerSub">—</div>
+      </section>
+      <section class="card" aria-live="polite">
+        <div class="card-title">Leaderboard</div>
+        <p id="scoreboardEmpty" class="empty-note" style="display:none">Scoreboard hidden</p>
+        <ol id="scoreboardList" class="scoreboard-list"></ol>
+      </section>
+      <section class="card" aria-live="polite">
+        <div class="card-title">Recent Rounds</div>
+        <ul id="historyList" class="history-list"></ul>
+        <p id="historyEmpty" class="empty-note">Awaiting first results…</p>
+      </section>
+    </main>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/public/presentation.js"></script>
+</body>
+</html>
