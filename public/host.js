@@ -23,6 +23,96 @@
   const historyMiniEl = document.getElementById('historyMini');
   const fStatusChip = document.getElementById('fStatusChip');
   const fPreview = document.getElementById('fPreview');
+  const toastsEl = document.getElementById('toasts');
+
+  const APPLIED_TIMEOUT = 3200;
+  const appliedTimers = new WeakMap();
+  const pendingButtons = new Map();
+
+  function showToast(message, type = 'success'){
+    if (!toastsEl || !message) return;
+    const toast = document.createElement('div');
+    toast.className = 'toast' + (type === 'error' ? ' error' : ' success');
+    toast.textContent = message;
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-6px)';
+    toast.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+    toastsEl.appendChild(toast);
+    requestAnimationFrame(()=>{
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateY(0)';
+    });
+    setTimeout(()=>{
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(-6px)';
+      setTimeout(()=>{ if (toast.parentNode) toast.parentNode.removeChild(toast); }, 260);
+    }, 3200);
+  }
+
+  function clearAppliedState(button){
+    if (!button) return;
+    const timer = appliedTimers.get(button);
+    if (timer) clearTimeout(timer);
+    appliedTimers.delete(button);
+    button.disabled = false;
+    button.classList.remove('applied');
+  }
+
+  function markApplied(button){
+    if (!button) return;
+    clearAppliedState(button);
+    button.classList.add('applied');
+    button.disabled = true;
+    const timer = setTimeout(()=>{
+      button.classList.remove('applied');
+      button.disabled = false;
+      appliedTimers.delete(button);
+    }, APPLIED_TIMEOUT);
+    appliedTimers.set(button, timer);
+  }
+
+  function removePendingForButton(button){
+    if (!button) return;
+    for (const [key, value] of pendingButtons.entries()){
+      if (value === button) pendingButtons.delete(key);
+    }
+  }
+
+  function watchInputsFor(button, container){
+    if (!button || !container) return;
+    const handler = ()=>{
+      removePendingForButton(button);
+      clearAppliedState(button);
+    };
+    container.querySelectorAll('input, select, textarea').forEach(el=>{
+      el.addEventListener('input', handler);
+      el.addEventListener('change', handler);
+    });
+  }
+
+  function setupConfigAction({ buttonId, container, eventName, collect, ackAction, successMessage, errorMessage }){
+    const button = document.getElementById(buttonId);
+    if (!button) return;
+    const scope = container || button.closest('.gs-row') || button.parentElement;
+    watchInputsFor(button, scope);
+    button.addEventListener('click', ()=>{
+      if (button.disabled && appliedTimers.has(button)) return;
+      const payload = typeof collect === 'function' ? collect() : undefined;
+      if (ackAction) pendingButtons.set(ackAction, button);
+      socket.emit(eventName, payload, (resp={})=>{
+        if (resp && resp.ok === false){
+          if (ackAction) pendingButtons.delete(ackAction);
+          clearAppliedState(button);
+          showToast(resp.error || errorMessage || 'Unable to apply changes', 'error');
+          return;
+        }
+        if (!ackAction){
+          showToast(successMessage || 'Settings applied', 'success');
+          markApplied(button);
+        }
+      });
+    });
+  }
   function renderFinalBoostStatus(s){
     try{
       const fb = s.settings?.finalBoost || {enabled:false};
@@ -68,6 +158,91 @@
   document.getElementById('newMatch').onclick = ()=> socket.emit('host_new_match');
   document.getElementById('startRound').onclick = ()=> socket.emit('host_start_round');
   document.getElementById('endRound').onclick = ()=> socket.emit('host_end_round');
+
+  setupConfigAction({
+    buttonId: 'applyFinal',
+    eventName: 'host_set_final_boost',
+    ackAction: 'apply_final_boost',
+    collect: ()=>({
+      enabled: document.getElementById('fEnable')?.value === '1',
+      multiplier: Number(document.getElementById('fMult')?.value || 2),
+      overrideBonus: document.getElementById('fOver')?.value === '1'
+    })
+  });
+
+  setupConfigAction({
+    buttonId: 'applyBonus',
+    eventName: 'host_set_bonus',
+    successMessage: 'Bonus settings applied',
+    collect: ()=>({
+      enabled: document.getElementById('bEnable')?.value === '1',
+      value: Number(document.getElementById('bMult')?.value || 2),
+      frequency: document.getElementById('bFreq')?.value || 'off'
+    })
+  });
+
+  setupConfigAction({
+    buttonId: 'applyStreak',
+    eventName: 'host_set_streak',
+    ackAction: 'apply_streak',
+    collect: ()=>({
+      enabled: document.getElementById('sEnable')?.value === '1',
+      cap: Number(document.getElementById('sCap')?.value || 3)
+    })
+  });
+
+  setupConfigAction({
+    buttonId: 'applyComeback',
+    eventName: 'host_set_comeback',
+    ackAction: 'apply_comeback',
+    collect: ()=>({
+      enabled: document.getElementById('cEnable')?.value === '1',
+      threshold: Number(document.getElementById('cK')?.value || 3)
+    })
+  });
+
+  (function(){
+    const button = document.getElementById('applyTheme');
+    if (!button) return;
+    const scope = button.closest('.gs-row') || button.parentElement;
+    watchInputsFor(button, scope);
+    button.addEventListener('click', ()=>{
+      if (button.disabled && appliedTimers.has(button)) return;
+      const theme = document.getElementById('theme')?.value || 'default';
+      const spotlight = document.getElementById('spot')?.value === '1';
+      pendingButtons.set('apply_theme', button);
+      pendingButtons.set('apply_spotlight', button);
+      socket.emit('host_set_theme', { theme }, (resp={})=>{
+        if (resp && resp.ok === false){
+          pendingButtons.delete('apply_theme');
+          showToast(resp.error || 'Failed to apply theme', 'error');
+          clearAppliedState(button);
+        }
+      });
+      socket.emit('host_set_spotlight', { enabled: spotlight }, (resp={})=>{
+        if (resp && resp.ok === false){
+          pendingButtons.delete('apply_spotlight');
+          showToast(resp.error || 'Failed to apply spotlight', 'error');
+          clearAppliedState(button);
+        }
+      });
+    });
+  })();
+
+  (function(){
+    const button = document.getElementById('bForce');
+    if (!button) return;
+    button.addEventListener('click', ()=>{
+      socket.emit('host_set_bonus', { manualFlag: true }, (resp={})=>{
+        if (resp && resp.ok === false){
+          showToast(resp.error || 'Unable to flag next bonus round', 'error');
+          return;
+        }
+        showToast('Next round flagged as bonus', 'success');
+        markApplied(button);
+      });
+    });
+  })();
 
   let activeStart = 0; let roundActive = false; let timerInt = null;
   function fmt(ms){ const m=Math.floor(ms/60000), s=Math.floor((ms%60000)/1000), x=ms%1000; return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+'.'+String(x).padStart(3,'0'); }
@@ -134,6 +309,19 @@
     else if (s.activeHoldsRecap){ renderActiveHoldsRecap(s.activeHoldsRecap); }
     else { activeHoldsEl.innerHTML = ''; }
   });
-})();
-  
+
+  socket.on('host_action_ack', (ack={})=>{
+    const { ok=true, detail='', action='' } = ack;
+    const type = ok ? 'success' : 'error';
+    const message = detail || (ok ? 'Action completed' : 'Action failed');
+    if (message) showToast(message, type);
+    if (action && pendingButtons.has(action)){
+      const btn = pendingButtons.get(action);
+      pendingButtons.delete(action);
+      if (ok) markApplied(btn);
+      else clearAppliedState(btn);
+    }
+  });
+
   socket.on('final_boost_changed', ()=>{ /* request latest status via host_status stream */ });
+})();
