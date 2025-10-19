@@ -20,6 +20,12 @@
   const lastResultEl = document.getElementById('lastResult');
   const hostScoreTable = document.getElementById('hostScoreTable');
   const activeHoldsEl = document.getElementById('activeHolds');
+  const nextReadyBlock = document.getElementById('nextReadyBlock');
+  const nextReadyCounts = document.getElementById('nextReadyCounts');
+  const nextReadyNames = document.getElementById('nextReadyNames');
+  const nextReadyCountdown = document.getElementById('nextReadyCountdown');
+  const startRoundBtn = document.getElementById('startRound');
+  const endRoundBtn = document.getElementById('endRound');
   const historyMiniEl = document.getElementById('historyMini');
   const fStatusChip = document.getElementById('fStatusChip');
   const fPreview = document.getElementById('fPreview');
@@ -156,8 +162,8 @@
   };
   document.getElementById('stopGame').onclick = ()=> socket.emit('host_stop_game');
   document.getElementById('newMatch').onclick = ()=> socket.emit('host_new_match');
-  document.getElementById('startRound').onclick = ()=> socket.emit('host_start_round');
-  document.getElementById('endRound').onclick = ()=> socket.emit('host_end_round');
+  if (startRoundBtn) startRoundBtn.onclick = ()=> socket.emit('host_start_round');
+  if (endRoundBtn) endRoundBtn.onclick = ()=> socket.emit('host_end_round');
 
   setupConfigAction({
     buttonId: 'applyFinal',
@@ -282,6 +288,19 @@
     activeHoldsEl.innerHTML = '<h4>Last round recap (Round '+recap.round+')</h4>'+body;
   }
 
+  let nextReadyCountdownTimer = null;
+  let nextReadyCountdownCfg = null;
+  function stopNextReadyCountdown(){ if (nextReadyCountdownTimer){ clearInterval(nextReadyCountdownTimer); nextReadyCountdownTimer=null; } }
+  function drawNextReadyCountdown(){
+    if (!nextReadyCountdownCfg){ if (nextReadyCountdown) nextReadyCountdown.style.display='none'; stopNextReadyCountdown(); return; }
+    const remain = Math.max(0, (nextReadyCountdownCfg.startTs + nextReadyCountdownCfg.durationMs) - serverNow());
+    if (nextReadyCountdown){
+      nextReadyCountdown.textContent = 'Auto-start in ' + Math.ceil(remain/1000) + 's';
+      nextReadyCountdown.style.display = 'inline-block';
+    }
+    if (remain <= 0){ stopNextReadyCountdown(); }
+  }
+
   socket.on('host_status', (s)=>{
     roundNumEl.textContent = s.currentRound; roundTotalEl.textContent = s.settings.totalRounds;
     roundActive = s.roundActive; phaseEl.textContent = s.phase;
@@ -298,6 +317,40 @@
     });
 
     if (s.phase === 'arming' && s.arming){ armingRow.style.display='block'; readyCountEl.textContent = s.arming.readyCount || 0; requiredCountEl.textContent = s.arming.requiredCount || 0; } else { armingRow.style.display='none'; }
+
+    if (s.nextRound && s.nextRound.active){
+      if (nextReadyBlock){ nextReadyBlock.style.display='block'; }
+      const ready = s.nextRound.readyCount || 0;
+      const required = s.nextRound.requiredCount || 0;
+      const eligible = s.nextRound.eligibleCount || required;
+      if (nextReadyCounts){
+        const suffix = eligible > required ? ` (eligible ${eligible})` : '';
+        nextReadyCounts.textContent = `Ready ${ready} / ${required}${suffix}`;
+      }
+      if (nextReadyNames){
+        const names = (s.nextRound.readyList||[]).map(r=>r.name||'Player').join(', ');
+        nextReadyNames.textContent = names ? `Ready: ${names}` : 'Waiting for players…';
+      }
+      if (startRoundBtn){ startRoundBtn.disabled = !s.nextRound.canForce; }
+      if (s.nextRound.countdown){
+        nextReadyCountdownCfg = s.nextRound.countdown;
+        drawNextReadyCountdown();
+        if (!nextReadyCountdownTimer) nextReadyCountdownTimer = setInterval(drawNextReadyCountdown, 200);
+      } else {
+        nextReadyCountdownCfg = null;
+        if (nextReadyCountdown) nextReadyCountdown.style.display='none';
+        stopNextReadyCountdown();
+      }
+    } else {
+      if (nextReadyBlock){ nextReadyBlock.style.display='none'; }
+      nextReadyCountdownCfg = null;
+      stopNextReadyCountdown();
+      if (nextReadyCountdown) nextReadyCountdown.style.display='none';
+      if (startRoundBtn){
+        const canForce = !!(s.nextRound && s.nextRound.canForce);
+        startRoundBtn.disabled = !canForce;
+      }
+    }
 
     const hrows = (s.history||[]).map(h=>'<tr><td>#'+h.round+'</td><td>'+(h.winnerName || '—')+'</td><td>'+fmt(h.winnerMs)+'</td><td>🏆 '+(h.winnerTokens||0)+'</td></tr>').join('');
     historyMiniEl.innerHTML = '<table><thead><tr><th>Round</th><th>Winner</th><th>Held</th><th>Winner 🏆</th></tr></thead><tbody>'+ (hrows || '<tr><td colspan=4 class="muted">No rounds yet</td></tr>') +'</tbody></table>';

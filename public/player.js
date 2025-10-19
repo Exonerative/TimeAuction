@@ -39,6 +39,10 @@
   const winnerBanner = document.getElementById('winnerBanner');
   const wbTitle = document.getElementById('wbTitle');
   const wbSub = document.getElementById('wbSub');
+  const nextReadyPanel = document.getElementById('nextReadyPanel');
+  const nextReadyStatus = document.getElementById('nextReadyStatus');
+  const toggleReadyBtn = document.getElementById('toggleReadyBtn');
+  const nextReadyCountdownPlayer = document.getElementById('nextReadyCountdownPlayer');
   function showBanner(title, sub, ms=2600){
     if (!winnerBanner) return;
     try{
@@ -57,6 +61,9 @@
 
   let joined=false, inHold=false, exhausted=false, roundActive=false, releasedOut=false, disabledUI=false, phase='idle', myId=null;
   let activeStart=0, activationTs=0, timerInt=null;
+  let nextReadyState = { active:false, readyIds:[] };
+  let nextReadyTimer = null;
+  let nextReadyCountdownCfg = null;
 
   // Heartbeat ramp config + loop
   let hbCfg = { enabled:true, intervalSec:30, multiplier:0.9, minMs:750, maxMs:2000 };
@@ -75,6 +82,49 @@
   function vibrate(ms){ if (navigator.vibrate) navigator.vibrate(ms); }
   function askNotifyPermission(){ try{ if ('Notification' in window && Notification.permission==='default'){ Notification.requestPermission(); } }catch(e){} }
   function notify(title, body){ try{ if ('Notification' in window && Notification.permission==='granted'){ const n=new Notification(title,{ body }); setTimeout(()=>n.close&&n.close(), 4000); } }catch(e){} }
+
+  function stopNextReadyCountdown(){ if (nextReadyTimer){ clearInterval(nextReadyTimer); nextReadyTimer = null; } }
+  function drawNextReadyCountdown(){
+    if (!nextReadyCountdownPlayer || !nextReadyCountdownCfg){ if (nextReadyCountdownPlayer) nextReadyCountdownPlayer.style.display='none'; stopNextReadyCountdown(); return; }
+    const remain = Math.max(0, (nextReadyCountdownCfg.startTs + nextReadyCountdownCfg.durationMs) - serverNow());
+    nextReadyCountdownPlayer.textContent = 'Auto-start in ' + Math.ceil(remain/1000) + 's';
+    nextReadyCountdownPlayer.style.display = 'inline-block';
+    if (remain <= 0){ stopNextReadyCountdown(); }
+  }
+  function updateNextReadyUI(){
+    if (!nextReadyPanel || !toggleReadyBtn) return;
+    const active = !!(nextReadyState && nextReadyState.active && joined && phase === 'idle' && !roundActive);
+    if (!active){
+      nextReadyCountdownCfg = null;
+      nextReadyPanel.style.display = 'none';
+      if (nextReadyCountdownPlayer){ nextReadyCountdownPlayer.style.display = 'none'; nextReadyCountdownPlayer.textContent=''; }
+      stopNextReadyCountdown();
+      return;
+    }
+    nextReadyPanel.style.display = 'block';
+    const readyCount = nextReadyState.readyCount || 0;
+    const requiredCount = nextReadyState.requiredCount || 0;
+    const eligible = nextReadyState.eligibleCount || requiredCount;
+    if (nextReadyStatus){
+      const suffix = eligible > requiredCount ? ` (eligible ${eligible})` : '';
+      nextReadyStatus.textContent = `Ready ${readyCount} / ${requiredCount}${suffix}`;
+    }
+    const readyIds = new Set(nextReadyState.readyIds || []);
+    const isReady = readyIds.has(myId);
+    toggleReadyBtn.textContent = isReady ? 'Cancel ready' : 'I\'m ready';
+    toggleReadyBtn.classList.toggle('ready', isReady);
+    toggleReadyBtn.classList.toggle('primary', !isReady);
+    toggleReadyBtn.disabled = (!isReady && exhausted) || !joined || disabledUI;
+    if (nextReadyState.countdown){
+      nextReadyCountdownCfg = nextReadyState.countdown;
+      drawNextReadyCountdown();
+      if (!nextReadyTimer) nextReadyTimer = setInterval(drawNextReadyCountdown, 200);
+    } else {
+      nextReadyCountdownCfg = null;
+      if (nextReadyCountdownPlayer){ nextReadyCountdownPlayer.style.display='none'; nextReadyCountdownPlayer.textContent=''; }
+      stopNextReadyCountdown();
+    }
+  }
 
   function setHoldClasses({ idle=false, pressed=false, disabled=false }){ const el = holdArea; el.classList.toggle('idle', !!idle); el.classList.toggle('pressed', !!pressed); el.classList.toggle('disabled', !!disabled); el.setAttribute('aria-pressed', pressed ? 'true' : 'false'); }
 
@@ -107,6 +157,7 @@
         phaseBadge.textContent = 'Idle'; phaseBadge.classList.add('ph-idle');
         phaseCopy.textContent  = 'Waiting for host…';
     }
+    updateNextReadyUI();
   }
 
   function updateHoldVisual(){
@@ -134,6 +185,15 @@
   // events
   joinBtn.onclick = ()=>{ const name = nameInput.value.trim().slice(0,24) || 'Player'; socket.emit('player_join', { name }); };
   reconnectBtn.onclick = ()=>{ const pin = pinInput.value.trim(); if (!pin) return alert('Enter your PIN'); socket.emit('player_reconnect', { pin }); };
+  if (toggleReadyBtn){
+    toggleReadyBtn.onclick = ()=>{
+      if (!nextReadyState || !nextReadyState.active) return;
+      const readyIds = new Set(nextReadyState.readyIds || []);
+      const isReady = readyIds.has(myId);
+      if (isReady){ socket.emit('player_unready_next'); }
+      else if (!exhausted){ socket.emit('player_ready_next'); }
+    };
+  }
   document.addEventListener('contextmenu', e=>e.preventDefault());
   holdArea.addEventListener('touchstart', e=>{ e.preventDefault(); startHold(); }, {passive:false});
   holdArea.addEventListener('touchend',   e=>{ e.preventDefault(); endHold(); }, {passive:false});
@@ -148,6 +208,7 @@
     joinCard.style.display='none'; gameCard.style.display='block';
     askNotifyPermission();
     setPhaseUI('idle'); updateHoldVisual(); stopTimer(); cancelHeartbeat();
+    updateNextReadyUI();
   });
   socket.on('reconnect_result', (r)=>{
     if (!r.ok){ alert(r.error || 'Reconnect failed'); return; }
@@ -156,7 +217,16 @@
 
   socket.on('lobby_update', (l)=>{ if (!joined) return; const me=(l.lobby||[]).find(p=>p.id===myId); if (me){ tokenCount.textContent='🏆 '+me.tokens; } });
 
-  socket.on('arming_started', ()=>{ if (exhausted){ disabledUI=false; try{ phaseCopy.textContent='Bank exhausted — press & hold to arm the next round (you can’t play).'; }catch(e){} } setPhaseUI('arming'); roundActive=false; releasedOut=false; disabledUI=false; updateHoldVisual(); stopTimer(); cancelHeartbeat(); notify('Round starting','Press & hold now — all players must hold.'); });
+  socket.on('next_round_ready_state', (d={})=>{
+    nextReadyState = Object.assign({ active:false, readyIds:[] }, d || {});
+    updateNextReadyUI();
+  });
+
+  socket.on('arming_started', ()=>{
+    nextReadyCountdownCfg = null; stopNextReadyCountdown(); if (nextReadyCountdownPlayer) nextReadyCountdownPlayer.style.display='none'; if (nextReadyPanel) nextReadyPanel.style.display='none';
+    if (exhausted){ disabledUI=false; try{ phaseCopy.textContent='Bank exhausted — press & hold to arm the next round (you can’t play).'; }catch(e){} }
+    setPhaseUI('arming'); roundActive=false; releasedOut=false; disabledUI=false; updateHoldVisual(); stopTimer(); cancelHeartbeat(); notify('Round starting','Press & hold now — all players must hold.');
+  });
 
   // Countdown 3,2,1,0 with unified activationTs
   let cdTimer = null;
@@ -174,6 +244,7 @@
     if (cdTimer) clearInterval(cdTimer);
     draw(); cdTimer=setInterval(draw, 100);
     stopTimer(); cancelHeartbeat();
+    updateNextReadyUI();
   });
 
   socket.on('round_started', (d)=>{
@@ -189,9 +260,10 @@
     }, delay);
   });
 
-  socket.on('round_result', (d)=>{ setPhaseUI('idle'); roundActive=false; inHold=false; releasedOut=false; disabledUI=false; updateHoldVisual(); if (d.winner){ roundResult.textContent = 'Round '+d.round+': '+d.winner+' held '+fmt(d.winnerMs)+' · now at '+d.winnerTokens; if (winnerBanner){ wbTitle.textContent = d.winner + ' wins Round ' + d.round; wbSub.textContent = 'Held ' + fmt(d.winnerMs) + ' · 🏆 ' + d.winnerTokens; winnerBanner.classList.add('show'); setTimeout(()=> winnerBanner.classList.remove('show'), 2600); } } stopTimer(); cancelHeartbeat(); });
+  socket.on('round_result', (d)=>{ setPhaseUI('idle'); roundActive=false; inHold=false; releasedOut=false; disabledUI=false; updateHoldVisual(); if (d.winner){ roundResult.textContent = 'Round '+d.round+': '+d.winner+' held '+fmt(d.winnerMs)+' · now at '+d.winnerTokens; if (winnerBanner){ wbTitle.textContent = d.winner + ' wins Round ' + d.round; wbSub.textContent = 'Held ' + fmt(d.winnerMs) + ' · 🏆 ' + d.winnerTokens; winnerBanner.classList.add('show'); setTimeout(()=> winnerBanner.classList.remove('show'), 2600); } } stopTimer(); cancelHeartbeat(); updateNextReadyUI(); });
 
   socket.on('game_over', (d)=>{
+    nextReadyCountdownCfg = null; stopNextReadyCountdown(); if (nextReadyPanel) nextReadyPanel.style.display='none'; if (nextReadyCountdownPlayer) nextReadyCountdownPlayer.style.display='none';
     setPhaseUI('ended');
     // Winner banner
     if (d.champion){ finalChampion.textContent = 'Champion: '+d.champion.name+' ('+d.champion.tokens+')'; }
@@ -219,7 +291,7 @@
   });
   closeFinal.onclick = ()=>{ finalModal.style.display='none'; };
 
-  socket.on('exhausted', ()=>{ setPhaseUI('exhausted'); exhausted=true; inHold=false; disabledUI=true; updateHoldVisual(); vibrate(80); exhaustedMsg.style.display='block'; setTimeout(()=>exhaustedMsg.style.display='none', 2500); });
+  socket.on('exhausted', ()=>{ setPhaseUI('exhausted'); exhausted=true; inHold=false; disabledUI=true; updateHoldVisual(); vibrate(80); exhaustedMsg.style.display='block'; setTimeout(()=>exhaustedMsg.style.display='none', 2500); updateNextReadyUI(); });
 
   // Public scoreboard (sorted, includes rank #; no bank shown during play)
   socket.on('scoreboard_update', (d)=>{
@@ -256,4 +328,5 @@
   socket.on('game_started', (d)=>{
     const txt = (d && d.rulesText) ? String(d.rulesText).replace(/\n/g, ' \u2022 ') : 'Game started';
     showBanner('Game Started', txt, 4000);
+    exhausted = false; disabledUI = false; updateNextReadyUI();
   });

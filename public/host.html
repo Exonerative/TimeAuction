@@ -21,6 +21,11 @@
   #activeHolds{margin-top:10px}
   #activeHolds .bar{height:6px;background:#e5e7eb;border-radius:6px;overflow:hidden}
   #activeHolds .fill{height:6px;background:#10b981}
+  #nextReadyBlock{margin-top:10px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fafb;display:none}
+  #nextReadyBlock .title{font-weight:600;font-size:14px;color:#111827}
+  #nextReadyCounts{font-weight:700;font-size:16px;color:#111827}
+  #nextReadyNames{font-size:12px;color:#6b7280;margin-top:4px}
+  #nextReadyCountdown{display:none;margin-top:6px}
 
   .toasts{position:fixed;top:12px;right:12px;display:grid;gap:8px;z-index:9999}
   .toast{background:#0f172a;color:#e6f0ff;border:1px solid #1e293b;border-radius:12px;padding:10px 12px;box-shadow:0 6px 30px rgba(0,0,0,.25);max-width:320px}
@@ -70,8 +75,15 @@
       <div id="activeHolds"></div>
 
       <div class="muted" id="armingRow" style="margin-top:6px;display:none">Arming — ready <span id="readyCount">0</span>/<span id="requiredCount">0</span></div>
+      <div id="nextReadyBlock">
+        <div class="title">Next round readiness</div>
+        <div id="nextReadyCounts">Ready 0 / 0</div>
+        <div id="nextReadyNames" class="muted">Waiting for players…</div>
+        <span id="nextReadyCountdown" class="pill muted"></span>
+      </div>
+
       <div style="margin-top:10px">
-        <button id="startRound" class="btn primary">Start Round</button>
+        <button id="startRound" class="btn primary">Force start next round</button>
         <button id="endRound" class="btn">End Round</button>
       </div>
       <div style="margin-top:14px" id="lastResult"></div>
