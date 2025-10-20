@@ -392,9 +392,15 @@
   .round-recap__header-text{display:grid;gap:10px}
   .round-recap__eyebrow{font-size:12px;letter-spacing:.46em;text-transform:uppercase;color:#5ef8ff;text-shadow:0 0 16px rgba(80,230,255,.45);font-weight:800}
   .round-recap__title{margin:0;font-size:clamp(26px,6vw,36px);font-weight:900;letter-spacing:.04em;text-transform:uppercase;color:#f8fbff;text-shadow:0 14px 38px rgba(4,12,26,.75)}
+  .round-recap__champion{margin:0;font-size:clamp(32px,8vw,48px);font-weight:900;letter-spacing:.36em;text-transform:uppercase;background:linear-gradient(120deg,#f8fafc 0%,#82f5ff 35%,#0ea5e9 80%);-webkit-background-clip:text;color:transparent;text-shadow:0 22px 48px rgba(4,18,38,.85),0 0 32px rgba(90,237,255,.45)}
+  .round-recap__champion[hidden]{display:none}
   .round-recap__subtitle{margin:0;font-size:15px;color:#9ddcff;text-shadow:0 0 20px rgba(104,206,255,.4)}
   .round-recap__subtitle:empty{display:none}
   .round-recap__subtitle strong{color:#fef2c0}
+  #roundRecapPanel.has-winner .round-recap__header{padding:24px 32px 18px;align-items:flex-end}
+  #roundRecapPanel.has-winner .round-recap__header-text{gap:6px}
+  #roundRecapPanel.has-winner .round-recap__title{font-size:clamp(18px,4.2vw,24px);letter-spacing:.22em;color:#9acbfd;text-shadow:0 8px 24px rgba(6,20,40,.65)}
+  #roundRecapPanel.has-winner .round-recap__subtitle{font-size:13px;letter-spacing:.28em;text-transform:uppercase;color:#ffe5b4;text-shadow:0 0 18px rgba(255,196,120,.45),0 0 32px rgba(255,130,70,.28)}
   .round-recap__close{margin:2px 0 0 auto;width:40px;height:40px;border-radius:14px;border:1px solid rgba(94,247,255,.28);background:linear-gradient(140deg,rgba(6,24,44,.9) 0%,rgba(12,48,84,.65) 80%);color:#87eaff;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease,color .18s ease}
   .round-recap__close:hover,.round-recap__close:focus-visible{transform:translateY(-1px);box-shadow:0 0 18px rgba(94,247,255,.45);border-color:rgba(134,232,255,.65);color:#c8f6ff;outline:none}
   .round-recap__body{padding:24px 32px 18px;display:grid;gap:20px;position:relative}
@@ -415,6 +421,9 @@
     #roundRecapPanel{padding:18px}
     .round-recap__header{padding:24px 22px 18px}
     .round-recap__header::after{inset:auto 22px 10px 22px}
+    #roundRecapPanel.has-winner .round-recap__header{padding:20px 22px 14px}
+    #roundRecapPanel.has-winner .round-recap__champion{font-size:clamp(28px,12vw,40px);letter-spacing:.28em}
+    #roundRecapPanel.has-winner .round-recap__subtitle{font-size:12px;letter-spacing:.24em}
     .round-recap__body{padding:20px 22px 16px}
     .round-recap__body::before{inset:auto 15% 0 15%}
     .round-recap__stats{grid-template-columns:1fr 1fr}
@@ -676,11 +685,12 @@
   </div>
 
   <div id="roundRecapPanel" aria-live="polite" aria-atomic="false">
-    <div class="round-recap" role="dialog" aria-modal="true" aria-labelledby="roundRecapLabel roundRecapTitle" aria-describedby="roundRecapSummary">
+    <div class="round-recap" role="dialog" aria-modal="true" aria-labelledby="roundRecapLabel roundRecapTitle roundRecapChampion" aria-describedby="roundRecapSummary">
       <div class="round-recap__header">
         <div class="round-recap__header-text">
           <div id="roundRecapLabel" class="round-recap__eyebrow">Round Winner</div>
           <div id="roundRecapTitle" class="round-recap__title">Round recap</div>
+          <div id="roundRecapChampion" class="round-recap__champion" hidden></div>
           <p id="roundRecapSubtitle" class="round-recap__subtitle"></p>
         </div>
         <button id="roundRecapClose" class="round-recap__close" type="button" aria-label="Dismiss round winner recap"><span aria-hidden="true">×</span></button>
