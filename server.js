@@ -596,6 +596,39 @@ function startGame(totalRounds, timeBankMinutes){
   updateNextRoundReadyState();
   emitHostStatus(); broadcastLobby(); broadcastPublicScoreboard();
 }
+function buildGameStartedPayload(){
+  const rules = {
+    totalRounds: state.settings.totalRounds,
+    countdownSeconds: Math.round((state.countdownMs||5000)/1000),
+    bonus: state.settings.bonus || {enabled:false},
+    timeBankMinutes: state.settings.timeBankMinutes,
+    finalRoundTokens: roundTokenValue(state.settings.totalRounds),
+    autoEnd: true
+  };
+  const bonusEnabled = !!(rules.bonus && rules.bonus.enabled);
+  let bonusText = '';
+  if (bonusEnabled){
+    const f = String(rules.bonus.frequency||'off');
+    if (f==='every-3') bonusText = 'every 3 ×'+(rules.bonus.value||2);
+    else if (f==='every-5') bonusText = 'every 5 ×'+(rules.bonus.value||2);
+    else if (f==='manual') bonusText = 'manual ×'+(rules.bonus.value||2);
+  }
+  const lines = [
+    `Rounds ${rules.totalRounds}, Countdown ${rules.countdownSeconds}s`,
+    bonusEnabled ? `Bonus ${bonusText}` : null,
+    `Final round is worth 🏆 ${rules.finalRoundTokens} tokens`,
+    `The round ends when no one is holding`
+  ].filter(Boolean);
+  const rulesText = lines.join('\n');
+  return { ts: now(), rules, rulesText };
+}
+
+function broadcastGameStarted(){
+  const payload = buildGameStartedPayload();
+  try{ io.emit('game_started', payload); }catch(e){}
+  return payload;
+}
+
 function newMatch(){ startGame(state.settings.totalRounds, state.settings.timeBankMinutes); }
 function stopGame(){
   state.started = false; state.currentRound = 0; state.roundActive = false; state.phase = 'idle'; state.countdownStartTs = 0;
@@ -765,35 +798,16 @@ io.on('connection', (socket) => {
 
     socket.on('host_start_game', ({ totalRounds, timeBankMinutes }, ack) => {
       startGame(totalRounds, timeBankMinutes);
-      const rules = {
-        totalRounds: state.settings.totalRounds,
-        countdownSeconds: Math.round((state.countdownMs||5000)/1000),
-        bonus: state.settings.bonus || {enabled:false},
-        timeBankMinutes: state.settings.timeBankMinutes,
-        finalRoundTokens: roundTokenValue(state.settings.totalRounds),
-        autoEnd: true
-      };
-      const bonusEnabled = !!(rules.bonus && rules.bonus.enabled);
-      let bonusText = '';
-      if (bonusEnabled){
-        const f = String(rules.bonus.frequency||'off');
-        if (f==='every-3') bonusText = 'every 3 ×'+(rules.bonus.value||2);
-        else if (f==='every-5') bonusText = 'every 5 ×'+(rules.bonus.value||2);
-        else if (f==='manual') bonusText = 'manual ×'+(rules.bonus.value||2);
-      }
-      const lines = [
-        `Rounds ${rules.totalRounds}, Countdown ${rules.countdownSeconds}s`,
-        bonusEnabled ? `Bonus ${bonusText}` : null,
-        `Final round is worth 🏆 ${rules.finalRoundTokens} tokens`,
-        `The round ends when no one is holding`
-      ].filter(Boolean);
-      const rulesText = lines.join('\n');
-      io.emit('game_started', { ts: now(), rules, rulesText });
+      broadcastGameStarted();
       io.to(socket.id).emit('host_action_ack', { ok:true, action:'start_game', detail:'Game started', ts: now() });
       if (typeof ack==='function') ack({ok:true});
     });
     socket.on('host_stop_game', () => { stopGame(); io.to(socket.id).emit('host_action_ack', { ok:true, action:'stop_game', detail:'Game stopped', ts: now() }); });
-    socket.on('host_new_match', () => { newMatch(); io.to(socket.id).emit('host_action_ack', { ok:true, action:'new_match', detail:'New match', ts: now() }); });
+    socket.on('host_new_match', () => {
+      newMatch();
+      broadcastGameStarted();
+      io.to(socket.id).emit('host_action_ack', { ok:true, action:'new_match', detail:'New match', ts: now() });
+    });
     socket.on('host_start_round', () => {
       if (!advanceToNextRound('host') && socket.id === state.hostSocketId){
         io.to(socket.id).emit('host_action_ack', { ok:false, action:'start_round', detail:'Unable to start round', ts: now() });
