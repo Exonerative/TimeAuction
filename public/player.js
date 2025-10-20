@@ -764,7 +764,19 @@
     }
   }
 
-  function setHoldClasses({ idle=false, pressed=false, disabled=false }){ const el = holdArea; el.classList.toggle('idle', !!idle); el.classList.toggle('pressed', !!pressed); el.classList.toggle('disabled', !!disabled); el.setAttribute('aria-pressed', pressed ? 'true' : 'false'); }
+  function setHoldClasses({ ready=false, pressed=false, disabled=false }){
+    const el = holdArea;
+    if (!el) return;
+    el.classList.remove('idle', 'pressed', 'disabled');
+    const isPressed = !!pressed;
+    const isDisabled = !!disabled;
+    const isReady = !!ready && !isPressed && !isDisabled;
+    el.classList.toggle('hold--pressed', isPressed);
+    el.classList.toggle('hold--disabled', isDisabled);
+    el.classList.toggle('hold--ready', isReady);
+    el.setAttribute('aria-pressed', isPressed ? 'true' : 'false');
+    el.setAttribute('aria-disabled', isDisabled ? 'true' : 'false');
+  }
 
   function setPhaseUI(tag){
     phase = tag;
@@ -809,9 +821,33 @@
   }
 
   function updateHoldVisual(){
-    if (disabledUI){ setHoldClasses({ disabled:true }); holdText.textContent = exhausted ? 'Exhausted' : 'Out this round'; holdSub.textContent = exhausted ? 'Bank exhausted — you can’t participate for the rest of the game.' : 'Wait for next round'; return; }
-    if (inHold){ setHoldClasses({ pressed:true }); holdText.textContent='Holding…'; holdSub.textContent = (phase==='arming')? 'Keep holding to start' : 'Keep holding'; }
-    else { setHoldClasses({ idle:true }); holdText.textContent = (phase==='arming') ? 'Hold to ready' : 'Press & Hold'; holdSub.textContent = (phase==='arming') ? 'All players must hold' : 'Release = out (this round)'; }
+    if (!holdArea) return;
+    const phaseClasses = [
+      ['hold--idlePhase', phase === 'idle'],
+      ['hold--arming', phase === 'arming'],
+      ['hold--countdown', phase === 'countdown'],
+      ['hold--active', phase === 'active'],
+      ['hold--ended', phase === 'ended'],
+      ['hold--exhausted', phase === 'exhausted']
+    ];
+    phaseClasses.forEach(([cls, active])=>holdArea.classList.toggle(cls, !!active));
+    const hasBonus = holdArea.classList.contains('bonus');
+    holdArea.classList.toggle('hold--bonus', hasBonus);
+    if (disabledUI){
+      setHoldClasses({ disabled:true });
+      holdText.textContent = exhausted ? 'Exhausted' : 'Out this round';
+      holdSub.textContent = exhausted ? 'Bank exhausted — you can’t participate for the rest of the game.' : 'Wait for next round';
+      return;
+    }
+    if (inHold){
+      setHoldClasses({ pressed:true });
+      holdText.textContent = 'Holding…';
+      holdSub.textContent = (phase === 'arming') ? 'Keep holding to start' : 'Keep holding';
+    } else {
+      setHoldClasses({ ready:true });
+      holdText.textContent = (phase === 'arming') ? 'Hold to ready' : 'Press & Hold';
+      holdSub.textContent = (phase === 'arming') ? 'All players must hold' : 'Release = out (this round)';
+    }
   }
 
   function startTimer(){
@@ -1016,7 +1052,9 @@
       setPhaseUI('active'); roundActive=true; releasedOut=false;
       if (exhausted){ disabledUI=true; }
       clearNoHoldVisual();
-      updateHoldVisual(); roundResult.textContent=''; holdArea.classList.toggle('bonus', !!d.bonusActive);
+      roundResult.textContent='';
+      if (holdArea){ holdArea.classList.toggle('bonus', !!d.bonusActive); }
+      updateHoldVisual();
       activeStart = ts; // exact activation epoch
       startTimer();
       cdOverlay.style.display='none'; scheduleHeartbeat(ts);
