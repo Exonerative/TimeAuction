@@ -31,8 +31,6 @@
   const spotlightFooter = document.getElementById('spotlightFooter');
   const confettiContainer = winnerSpotlight ? winnerSpotlight.querySelector('.spotlight-confetti') : null;
 
-  const MAX_HISTORY = 4;
-  const MAX_SCOREBOARD_ROWS = 5;
   let latestState = { scoreboard: [], history: [], scoreboardVisible: true, lastWinnerName: '', lastWinnerTokens: null, lastWinnerMs: null, lastWinnerRound: null };
   let timerInterval = null;
   let statusHoldUntil = 0;
@@ -323,7 +321,7 @@
     scoreboardEmpty.style.display = 'none';
     scoreboardList.style.display = rows.length ? 'grid' : 'none';
     const lastWinner = (latestState.lastWinnerName || '').toLowerCase();
-    rows.slice(0, MAX_SCOREBOARD_ROWS).forEach((row, index)=>{
+    rows.forEach((row, index)=>{
       const li = document.createElement('li');
       li.className = 'scoreboard-row';
       const main = document.createElement('div');
@@ -372,7 +370,7 @@
   function renderHistory(){
     if (!historyList || !historyEmpty) return;
     historyList.innerHTML = '';
-    const items = Array.isArray(latestState.history) ? latestState.history.slice(0, MAX_HISTORY) : [];
+    const items = Array.isArray(latestState.history) ? latestState.history : [];
     if (!items.length){
       historyEmpty.style.display = 'block';
       historyList.style.display = 'none';
@@ -561,7 +559,7 @@
     };
     const history = Array.isArray(latestState.history) ? latestState.history.slice() : [];
     history.unshift(entry);
-    latestState.history = history.slice(0, MAX_HISTORY);
+    latestState.history = history;
     latestState.lastWinnerName = info.winner || '';
     latestState.lastWinnerTokens = info.winnerTokens;
     latestState.lastWinnerMs = info.winnerMs;
@@ -772,6 +770,7 @@
       enumerable: false,
       writable: true,
       value: {
+        applyState,
         handleRoundNoHold,
         handleRoundResult,
         showWinnerSpotlight,
