@@ -246,6 +246,11 @@
   const closeFinal = document.getElementById('closeFinal');
 
   let joined=false, inHold=false, exhausted=false, roundActive=false, releasedOut=false, disabledUI=false, phase='idle', myId=null;
+  const HOLD_TIER_INTERVAL_MS = 15000;
+  const HOLD_TIER_CLASSES = ['hold--tier1','hold--tier2','hold--tier3','hold--tier4','hold--tier5','hold--tier6'];
+  let holdStartAt = 0;
+  let holdVolatilityRaf = null;
+  let currentHoldTier = 0;
   let activeStart=0, activationTs=0, timerInt=null;
   let nextReadyState = { active:false, readyIds:[] };
   let nextReadyTimer = null;
@@ -778,6 +783,62 @@
     el.setAttribute('aria-disabled', isDisabled ? 'true' : 'false');
   }
 
+  function setHoldTierClass(tier){
+    const clamped = Math.max(0, Math.min(HOLD_TIER_CLASSES.length, Math.floor(Number(tier) || 0)));
+    if (clamped === currentHoldTier) return;
+    currentHoldTier = clamped;
+    if (!holdArea) return;
+    holdArea.classList.remove(...HOLD_TIER_CLASSES);
+    if (clamped > 0){
+      holdArea.classList.add(HOLD_TIER_CLASSES[clamped - 1]);
+    }
+  }
+
+  function stopHoldVolatility(){
+    if (holdVolatilityRaf){
+      cancelAnimationFrame(holdVolatilityRaf);
+      holdVolatilityRaf = null;
+    }
+    holdStartAt = 0;
+    currentHoldTier = 0;
+    if (holdArea){
+      holdArea.classList.remove(...HOLD_TIER_CLASSES);
+      holdArea.style.setProperty('--hold-voltage', '0');
+    }
+  }
+
+  function holdVolatilityStep(){
+    holdVolatilityRaf = null;
+    if (!inHold || disabledUI){
+      stopHoldVolatility();
+      return;
+    }
+    if (!holdStartAt){
+      holdStartAt = serverNow();
+    }
+    const elapsed = Math.max(0, serverNow() - holdStartAt);
+    const tier = Math.min(HOLD_TIER_CLASSES.length, Math.floor(elapsed / HOLD_TIER_INTERVAL_MS));
+    setHoldTierClass(tier);
+    if (holdArea){
+      const maxDuration = HOLD_TIER_INTERVAL_MS * HOLD_TIER_CLASSES.length;
+      const ratio = maxDuration ? Math.min(1, elapsed / maxDuration) : 0;
+      holdArea.style.setProperty('--hold-voltage', ratio.toFixed(3));
+    }
+    holdVolatilityRaf = requestAnimationFrame(holdVolatilityStep);
+  }
+
+  function ensureHoldVolatilityLoop(){
+    if (!holdArea || disabledUI) return;
+    if (!holdStartAt){
+      holdStartAt = serverNow();
+      currentHoldTier = 0;
+      holdArea.classList.remove(...HOLD_TIER_CLASSES);
+      holdArea.style.setProperty('--hold-voltage', '0');
+    }
+    if (holdVolatilityRaf) return;
+    holdVolatilityRaf = requestAnimationFrame(holdVolatilityStep);
+  }
+
   function setPhaseUI(tag){
     phase = tag;
     const cls = ['ph-idle','ph-arming','ph-countdown','ph-active','ph-ended','ph-exhausted'];
@@ -834,16 +895,19 @@
     const hasBonus = holdArea.classList.contains('bonus');
     holdArea.classList.toggle('hold--bonus', hasBonus);
     if (disabledUI){
+      stopHoldVolatility();
       setHoldClasses({ disabled:true });
       holdText.textContent = exhausted ? 'Exhausted' : 'Out this round';
       holdSub.textContent = exhausted ? 'Bank exhausted — you can’t participate for the rest of the game.' : 'Wait for next round';
       return;
     }
     if (inHold){
+      ensureHoldVolatilityLoop();
       setHoldClasses({ pressed:true });
       holdText.textContent = 'Holding…';
       holdSub.textContent = (phase === 'arming') ? 'Keep holding to start' : 'Keep holding';
     } else {
+      stopHoldVolatility();
       setHoldClasses({ ready:true });
       holdText.textContent = (phase === 'arming') ? 'Hold to ready' : 'Press & Hold';
       holdSub.textContent = (phase === 'arming') ? 'All players must hold' : 'Release = out (this round)';
