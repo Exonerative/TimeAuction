@@ -263,7 +263,7 @@
   const closeFinal = document.getElementById('closeFinal');
 
   let joined=false, inHold=false, exhausted=false, roundActive=false, releasedOut=false, disabledUI=false, phase='idle', myId=null;
-  const HOLD_TIER_INTERVAL_MS = 15000;
+  const HOLD_TIER_INTERVAL_MS = 10000;
   const HOLD_TIER_CLASSES = ['hold--tier1','hold--tier2','hold--tier3','hold--tier4','hold--tier5','hold--tier6'];
   let holdStartAt = 0;
   let holdVolatilityRaf = null;
