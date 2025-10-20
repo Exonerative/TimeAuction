@@ -293,7 +293,7 @@
     const remain = Math.max(0, (nextReadyCountdownCfg.startTs + nextReadyCountdownCfg.durationMs) - serverNow());
     const label = 'Auto-start in ' + Math.ceil(remain/1000) + 's';
     nextReadyCountdownPlayer.textContent = label;
-    nextReadyCountdownPlayer.style.display = 'inline-block';
+    nextReadyCountdownPlayer.style.display = 'inline-flex';
     syncRoundRecapCountdown(remain);
     if (remain <= 0){
       stopNextReadyCountdown();
@@ -719,13 +719,17 @@
     const active = !!(nextReadyState && nextReadyState.active && joined && phase === 'idle' && !roundActive);
     if (!active){
       nextReadyCountdownCfg = null;
-      nextReadyPanel.style.display = 'none';
+      nextReadyPanel.classList.remove('show');
+      nextReadyPanel.setAttribute('aria-hidden','true');
+      toggleReadyBtn.classList.remove('btn-ready-highlight');
       if (nextReadyCountdownPlayer){ nextReadyCountdownPlayer.style.display = 'none'; nextReadyCountdownPlayer.textContent=''; }
       stopNextReadyCountdown();
       syncRoundRecapCountdown(null);
       return;
     }
-    nextReadyPanel.style.display = 'block';
+    const panelWasHidden = !nextReadyPanel.classList.contains('show');
+    nextReadyPanel.classList.add('show');
+    nextReadyPanel.setAttribute('aria-hidden','false');
     const readyCount = nextReadyState.readyCount || 0;
     const requiredCount = nextReadyState.requiredCount || 0;
     const eligible = nextReadyState.eligibleCount || requiredCount;
@@ -739,6 +743,15 @@
     toggleReadyBtn.classList.toggle('ready', isReady);
     toggleReadyBtn.classList.toggle('primary', !isReady);
     toggleReadyBtn.disabled = (!isReady && exhausted) || !joined || disabledUI;
+    const shouldHighlight = !isReady && !toggleReadyBtn.disabled;
+    toggleReadyBtn.classList.toggle('btn-ready-highlight', shouldHighlight);
+    if (panelWasHidden && shouldHighlight){
+      requestAnimationFrame(()=>{
+        try{
+          if (toggleReadyBtn && !toggleReadyBtn.disabled){ toggleReadyBtn.focus({ preventScroll:true }); }
+        }catch(e){}
+      });
+    }
     if (nextReadyState.countdown){
       nextReadyCountdownCfg = nextReadyState.countdown;
       drawNextReadyCountdown();

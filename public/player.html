@@ -271,11 +271,39 @@
     .round-recap__dismiss{width:100%;text-align:center}
   }
 
-  #nextReadyPanel{display:none;margin-top:12px;padding:12px;border:1px solid #1f2632;border-radius:14px;background:#11141c}
-  #nextReadyPanel .title{font-weight:700;font-size:14px;margin-bottom:4px}
-  #nextReadyStatus{color:#9aa0a6;font-size:13px}
-  #nextReadyCountdownPlayer{display:none;margin-top:8px;padding:4px 10px;border-radius:999px;background:#1f2632;color:#e5e7eb;font-size:12px}
+  .nextReadyPanel{position:-webkit-sticky;position:sticky;top:18px;z-index:60;margin:0 auto 12px;padding:20px 22px;border-radius:26px;background:linear-gradient(135deg,rgba(46,200,255,.25) 0%,rgba(14,120,178,.22) 32%,rgba(5,18,32,.88) 100%);border:1px solid rgba(94,233,255,.45);box-shadow:0 24px 70px rgba(6,30,54,.55),0 0 28px rgba(60,220,255,.32);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);display:flex;flex-direction:column;gap:12px;transform:translate3d(0,24px,0);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .35s ease,transform .5s cubic-bezier(.22,1,.36,1),box-shadow .4s ease;max-width:min(520px,100%);color:#e6f9ff;position:relative;}
+  .nextReadyPanel::before{content:"";position:absolute;inset:-12% -16%;background:radial-gradient(circle at 20% 20%,rgba(144,255,255,.35) 0%,transparent 55%);opacity:.75;pointer-events:none;z-index:-1;}
+  .nextReadyPanel::after{content:"";position:absolute;inset:1px;border-radius:24px;border:1px solid rgba(143,237,255,.22);mix-blend-mode:screen;pointer-events:none;}
+  .nextReadyPanel.show{opacity:1;visibility:visible;pointer-events:auto;transform:translate3d(0,0,0);animation:nextReadyEntrance .7s cubic-bezier(.22,1,.36,1) both;box-shadow:0 32px 80px rgba(7,34,60,.6),0 0 42px rgba(72,236,255,.42);}
+  @keyframes nextReadyEntrance{0%{opacity:0;transform:translate3d(0,36px,0) scale(.96);}60%{opacity:1;transform:translate3d(0,-6px,0) scale(1.01);}100%{opacity:1;transform:translate3d(0,0,0) scale(1);}}
+  .nextReadyPanel__header{display:flex;flex-direction:column;gap:4px;}
+  .nextReadyPanel__headline{font-size:13px;letter-spacing:.3em;text-transform:uppercase;color:#9ff3ff;font-weight:800;text-shadow:0 0 18px rgba(84,226,255,.45);}
+  .nextReadyPanel__status{font-size:14px;font-weight:600;color:#d0f6ff;opacity:.92;}
+  .nextReadyPanel__instruction{margin:0;font-size:15px;line-height:1.6;color:#e6f9ff;opacity:.95;}
+  .nextReadyPanel__cta{position:relative;display:flex;align-items:center;gap:16px;}
+  .nextReadyPanel__pulse{position:relative;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:rgba(34,194,255,.16);box-shadow:0 0 0 1px rgba(120,246,255,.25) inset,0 0 24px rgba(54,210,255,.45);animation:nextReadyPulse 2.4s ease-in-out infinite;}
+  .nextReadyPanel__pulse::before{content:"";position:absolute;inset:6px;border-radius:50%;background:radial-gradient(circle,rgba(144,244,255,.75) 0%,rgba(14,120,178,.55) 55%,rgba(0,0,0,0) 100%);opacity:.85;}
+  .nextReadyPanel__pulse::after{content:"";position:absolute;width:8px;height:8px;border-radius:50%;background:#9ff3ff;box-shadow:0 0 16px rgba(120,246,255,.8);}
+  @keyframes nextReadyPulse{0%{transform:scale(.92);box-shadow:0 0 0 1px rgba(120,246,255,.15) inset,0 0 12px rgba(54,210,255,.35);}55%{transform:scale(1.05);box-shadow:0 0 0 2px rgba(120,246,255,.35) inset,0 0 34px rgba(54,210,255,.55);}100%{transform:scale(.92);box-shadow:0 0 0 1px rgba(120,246,255,.15) inset,0 0 12px rgba(54,210,255,.35);}}
+  .nextReadyPanel__action{position:relative;display:flex;align-items:center;}
+  .nextReadyPanel__action button{position:relative;z-index:2;}
+  .nextReadyPanel__connector{position:absolute;left:50%;bottom:-26px;width:2px;height:22px;background:linear-gradient(180deg,rgba(118,234,255,.65) 0%,rgba(64,154,206,.35) 100%);box-shadow:0 0 12px rgba(90,220,255,.5);transform:translate(-50%,0);pointer-events:none;}
+  .nextReadyPanel__connector::after{content:"";position:absolute;left:50%;bottom:-8px;width:14px;height:14px;border-radius:2px;transform:translate(-50%,-2px) rotate(45deg);background:linear-gradient(135deg,rgba(120,246,255,.9) 0%,rgba(42,130,176,.75) 100%);box-shadow:0 0 16px rgba(86,236,255,.55);}
+  .nextReadyPanel__countdown{display:none;margin-top:10px;align-self:flex-start;padding:5px 14px;border-radius:999px;background:rgba(12,30,42,.75);border:1px solid rgba(102,232,255,.45);color:#e3f9ff;font-size:12px;letter-spacing:.18em;text-transform:uppercase;}
+  .btn-ready-highlight{background:linear-gradient(120deg,#3ddfff 0%,#1c9bff 60%,#0d3a78 100%)!important;color:#001c2d;border-color:rgba(80,220,255,.9)!important;box-shadow:0 0 0 0 rgba(80,220,255,.45);animation:btnReadyPulse 1.8s ease-in-out infinite;}
+  .btn-ready-highlight::after{content:"";position:absolute;inset:-6px;border-radius:18px;border:1px solid rgba(120,246,255,.5);box-shadow:0 0 24px rgba(90,220,255,.65);pointer-events:none;opacity:.75;animation:btnReadyHalo 2.2s ease-in-out infinite;}
+  @keyframes btnReadyPulse{0%{box-shadow:0 0 0 0 rgba(80,220,255,.45);}70%{box-shadow:0 0 0 14px rgba(80,220,255,0);}100%{box-shadow:0 0 0 0 rgba(80,220,255,0);}}
+  @keyframes btnReadyHalo{0%,100%{opacity:.75;transform:scale(.98);}50%{opacity:1;transform:scale(1.03);}}
   #toggleReadyBtn.ready{background:#1f2632;color:#e5e7eb;border-color:#1f2632}
+  @media (max-width:640px){
+    .nextReadyPanel{position:fixed;left:16px;right:16px;bottom:calc(24px + env(safe-area-inset-bottom));top:auto;transform:translate3d(0,40px,0);width:auto;max-width:520px;margin:0 auto;}
+    .nextReadyPanel.show{transform:translate3d(0,0,0);}
+  }
+  @media (max-width:420px){
+    .nextReadyPanel{padding:18px 18px 20px;border-radius:22px;}
+    .nextReadyPanel::after{border-radius:20px;}
+    .nextReadyPanel__instruction{font-size:14px;}
+  }
 
 
   /* Heartbeat pulse */
@@ -370,21 +398,28 @@
         <div class="roundTimerValue mono" id="roundTimer">00:00.000</div>
       </div>
 
+      <div id="nextReadyPanel" class="nextReadyPanel" aria-live="polite" aria-hidden="true">
+        <div class="nextReadyPanel__header">
+          <div class="nextReadyPanel__headline">Next round briefing</div>
+          <div id="nextReadyStatus" class="nextReadyPanel__status">Ready 0 / 0</div>
+        </div>
+        <p class="nextReadyPanel__instruction">Ready up so the next round can begin.</p>
+        <div class="nextReadyPanel__cta">
+          <span class="nextReadyPanel__pulse" aria-hidden="true"></span>
+          <div class="nextReadyPanel__action">
+            <button id="toggleReadyBtn" class="btn primary">I'm ready</button>
+            <span class="nextReadyPanel__connector" aria-hidden="true"></span>
+          </div>
+        </div>
+        <span id="nextReadyCountdownPlayer" class="nextReadyPanel__countdown"></span>
+      </div>
+
       <div id="holdArea" class="hold idle" role="button" aria-pressed="false" aria-label="Press and hold">
         <div><div id="holdText" class="holdText">Press & Hold</div><div id="holdSub" class="holdSub">Release = out (this round)</div></div>
       </div>
 
       <div id="exhaustedMsg" class="toast" style="display:none">Your time bank is exhausted. You are spectating.</div>
       <div id="roundResult" class="muted round-result"></div>
-
-      <div id="nextReadyPanel">
-        <div class="title">Next round</div>
-        <div id="nextReadyStatus">Ready 0 / 0</div>
-        <div class="row" style="gap:10px;margin-top:8px;flex-wrap:wrap">
-          <button id="toggleReadyBtn" class="btn primary">I'm ready</button>
-          <span id="nextReadyCountdownPlayer"></span>
-        </div>
-      </div>
 
       <div id="publicScoreCard" class="card pad">
         <h3>Scoreboard</h3>
