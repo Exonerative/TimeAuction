@@ -47,16 +47,41 @@
   .center{display:flex;align-items:center;justify-content:center}
   .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 
-  /* Phase Bar */
-  .phaseBar{display:flex;align-items:center;gap:10px;margin:8px 0 6px}
-  .phaseBadge{font-weight:700;font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid transparent}
-  .phaseCopy{color:#9aa0a6;font-size:13px}
+  /* Player HUD header */
+  .playerHud{display:grid;gap:12px;margin:12px 0 16px;grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}
+  .playerHud__panel{position:relative;padding:16px 18px;border-radius:18px;background:linear-gradient(155deg,rgba(16,26,44,.9) 0%,rgba(10,15,28,.78) 60%,rgba(9,12,22,.86) 100%);border:1px solid rgba(62,94,138,.52);box-shadow:0 16px 42px rgba(5,10,20,.5);display:flex;flex-direction:column;gap:6px;overflow:hidden}
+  .playerHud__panel::after{content:"";position:absolute;inset:1px;border-radius:16px;border:1px solid rgba(126,196,255,.18);opacity:.75;pointer-events:none}
+  .playerHud__panel::before{content:"";position:absolute;inset:-25% -20%;background:radial-gradient(circle at 24% 18%,rgba(94,224,255,.24) 0%,transparent 62%);opacity:.8;pointer-events:none}
+  .playerHud__panel > *{position:relative;z-index:1}
+  .playerHud__label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#7aa9d6;font-weight:700}
+  .playerHud__value{font-weight:800;font-size:16px;letter-spacing:.02em;color:#f1f5f9}
+  .playerHud__sub{color:#9aa0a6;font-size:12px}
+  .playerHud__panel--status{justify-content:center;align-items:center;text-align:center;padding:18px 16px;gap:10px}
+  .playerHud__panel--identity .playerHud__value{font-size:18px}
+  #phaseBar{display:flex;flex-direction:column;align-items:center;gap:8px;margin:0}
+  .phaseBadge{font-weight:800;font-size:12px;padding:6px 14px;border-radius:999px;border:1px solid transparent;letter-spacing:.16em;text-transform:uppercase;box-shadow:0 0 18px rgba(59,130,246,.28);background:#0f172a;color:#e2e8f0}
+  .phaseCopy{color:#cbd5f5;font-size:13px;opacity:.9;max-width:200px}
   .ph-idle{background:#0f172a;color:#e2e8f0;border-color:#1f2937}
   .ph-arming{background:#f59e0b20;color:#fbbf24;border-color:#f59e0b55}
   .ph-countdown{background:#fb923c20;color:#fdba74;border-color:#fb923c55}
   .ph-active{background:#10b98120;color:#34d399;border-color:#10b98155}
   .ph-ended{background:#6d28d920;color:#c4b5fd;border-color:#6d28d955}
   .ph-exhausted{background:#4b556320;color:#cbd5e1;border-color:#4b556355}
+  .playerHud__panel--tokens{align-items:flex-end;text-align:right}
+  .playerHud__panel--tokens .playerHud__value{display:flex;align-items:center;justify-content:flex-end;gap:6px;font-size:17px}
+  .playerHud__panel--tokens .playerHud__value span{font-size:18px}
+  .playerHud__panel--tokens .tokenIcon{font-size:22px;color:#fbbf24;text-shadow:0 0 16px rgba(251,191,36,.45);}
+  @media (max-width:640px){
+    .playerHud{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .playerHud__panel--status{grid-column:1/-1}
+  }
+  @media (max-width:420px){
+    .playerHud{grid-template-columns:1fr}
+    .playerHud__panel--tokens,.playerHud__panel--status{align-items:flex-start;text-align:left}
+    .playerHud__panel--status{padding:16px 14px}
+    #phaseBar{align-items:flex-start}
+    .phaseCopy{max-width:none;text-align:left}
+  }
 
   /* Round timer */
   .roundTimerPanel{position:relative;margin:12px 0 10px;padding:18px 22px;border-radius:24px;background:radial-gradient(circle at 12% 12%,rgba(59,130,246,.22) 0%,rgba(12,18,32,.35) 50%,rgba(10,13,22,.92) 100%);border:1px solid rgba(63,120,224,.45);box-shadow:0 18px 48px rgba(8,14,28,.55);display:grid;gap:10px;overflow:hidden;transition:border-color .28s ease,box-shadow .3s ease,transform .3s ease;
@@ -266,22 +291,22 @@
     </section>
 
     <div class="card pad" id="gameCard" style="display:none">
-      <div class="row" style="justify-content:space-between">
-        <div>
-          <div class="muted">Player</div>
-          <div id="playerName" style="font-weight:700"></div>
-          <div class="muted" style="font-size:12px">Your PIN: <span id="myPin" class="mono"></span></div>
+      <div class="playerHud" id="playerHud">
+        <div class="playerHud__panel playerHud__panel--identity">
+          <div class="playerHud__label">Player</div>
+          <div id="playerName" class="playerHud__value">—</div>
+          <div class="playerHud__sub">PIN: <span id="myPin" class="mono"></span></div>
         </div>
-        <div style="text-align:right">
-          <div class="muted">Victory tokens</div>
-          <div id="tokenCount" style="font-weight:700;text-align:right">🏆 0</div>
+        <div class="playerHud__panel playerHud__panel--status">
+          <div id="phaseBar" role="status" aria-live="polite">
+            <span id="phaseBadge" class="phaseBadge ph-idle">Idle</span>
+            <span id="phaseCopy" class="phaseCopy">Waiting for host…</span>
+          </div>
         </div>
-      </div>
-
-      <!-- Phase Bar -->
-      <div id="phaseBar" class="phaseBar" role="status" aria-live="polite">
-        <span id="phaseBadge" class="phaseBadge ph-idle">Idle</span>
-        <span id="phaseCopy" class="phaseCopy">Waiting for host…</span>
+        <div class="playerHud__panel playerHud__panel--tokens">
+          <div class="playerHud__label">Victory tokens</div>
+          <div id="tokenCount" class="playerHud__value"><span class="tokenIcon" aria-hidden="true">🏆</span> <span id="tokenCountValue">0</span></div>
+        </div>
       </div>
 
       <div class="gameMeta" id="gameMeta" aria-live="polite">
