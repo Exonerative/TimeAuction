@@ -27,7 +27,7 @@
   const statusMsg = document.getElementById('statusMsg');
 
   const playerName = document.getElementById('playerName');
-  const tokenCount = document.getElementById('tokenCount');
+  const tokenCountValue = document.getElementById('tokenCountValue');
   const roundResult = document.getElementById('roundResult');
   const holdArea = document.getElementById('holdArea');
   const holdText = document.getElementById('holdText');
@@ -855,7 +855,7 @@
   });
 
   socket.on('joined', (d)=>{
-    joined=true; myId=d.id; playerName.textContent=d.name; tokenCount.textContent='🏆 '+d.tokens;
+    joined=true; myId=d.id; playerName.textContent=d.name; tokenCountValue.textContent = (d.tokens != null ? d.tokens : '—');
     myTokensKnown = numberOrNull(d.tokens) ?? 0;
     myPinEl.textContent = d.pin || '';
     if (pinInput){ pinInput.value = d.pin || ''; }
@@ -893,7 +893,7 @@
     const me = getMyLobbyEntry();
     if (me){
       const tokens = numberOrNull(me.tokens) ?? 0;
-      tokenCount.textContent = '🏆 ' + tokens;
+      tokenCountValue.textContent = (tokens != null ? tokens : '—');
       myTokensKnown = tokens;
       if (sessionInfo && me.name && sessionInfo.name !== me.name){
         sessionInfo = { pin: sessionInfo.pin, name: me.name, sessionToken: sessionInfo.sessionToken };
@@ -1030,7 +1030,7 @@
       const me = getMyLobbyEntry();
       if (me){ latestTokens = numberOrNull(me.tokens); }
     }
-    if (latestTokens != null){ tokenCount.textContent = '🏆 ' + latestTokens; }
+    if (latestTokens != null){ tokenCountValue.textContent = latestTokens; }
 
     stopTimer(); cancelHeartbeat();
     updateNextReadyUI();
