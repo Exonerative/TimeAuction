@@ -1113,9 +1113,12 @@
         '<thead><tr><th>#</th><th>Player</th><th></th><th>Rounds Active</th><th>Bank Remaining</th><th>Last Win</th></tr></thead>'+
         '<tbody>'+rows+'</tbody>'+
       '</table>';
-    finalModal.style.display = 'flex';
+    finalModal.classList.add('show');
+    requestAnimationFrame(()=>{
+      closeFinal.focus({ preventScroll: true });
+    });
   });
-  closeFinal.onclick = ()=>{ finalModal.style.display='none'; };
+  closeFinal.onclick = ()=>{ finalModal.classList.remove('show'); };
 
   socket.on('exhausted', ()=>{ setPhaseUI('exhausted'); exhausted=true; inHold=false; disabledUI=true; updateHoldVisual(); vibrate(80); exhaustedMsg.style.display='block'; setTimeout(()=>exhaustedMsg.style.display='none', 2500); updateNextReadyUI(); });
 
