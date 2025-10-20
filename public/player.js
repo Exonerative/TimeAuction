@@ -631,7 +631,7 @@
       roundsLeftValue,
       roundsLeftNote,
       fallback: fallbackText,
-      autoHideMs: finalRound ? 9000 : 6500,
+      autoHideMs: 10000,
       tone: isNoHold ? 'danger' : 'default',
     };
   }
