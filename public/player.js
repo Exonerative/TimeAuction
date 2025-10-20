@@ -945,7 +945,13 @@
       ensureHoldVolatilityLoop();
       setHoldClasses({ pressed:true });
       holdText.textContent = 'Holding…';
-      holdSub.textContent = (phase === 'arming') ? 'Keep holding to start' : 'Keep holding';
+      let holdSubCopy = 'Keep holding';
+      if (phase === 'arming'){
+        holdSubCopy = 'Keep holding to start';
+      } else if (phase === 'countdown'){
+        holdSubCopy = 'Keep holding — release now if you don’t want to join.';
+      }
+      holdSub.textContent = holdSubCopy;
     } else {
       stopHoldVolatility();
       setHoldClasses({ ready:true });
