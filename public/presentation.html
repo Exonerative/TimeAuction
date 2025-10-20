@@ -20,7 +20,7 @@
       --accent-warm:#f6a55d;
       --accent-danger:#ff6767;
       --chip-bg:rgba(28,93,133,0.35);
-      --hud-height:96px;
+      --hud-height:auto;
       --deck-padding:32px;
       --deck-gutter:42px;
       font-family:"Inter",system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -93,20 +93,39 @@
       overflow:hidden;
     }
     header.hud-bar{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      align-items:stretch;
+      gap:28px;
+      position:relative;
+    }
+    .hud-panel{
+      background:linear-gradient(140deg,rgba(8,28,48,0.82),rgba(6,22,38,0.68));
+      border:1px solid rgba(56,213,255,0.22);
+      border-radius:22px;
+      padding:18px 24px;
       display:flex;
       align-items:center;
       justify-content:space-between;
-      gap:36px;
+      gap:24px;
+      box-shadow:0 16px 48px rgba(0,0,0,0.35);
+      min-height:0;
+      height:100%;
+    }
+    .hud-panel--status{
+      gap:28px;
+    }
+    .hud-panel.join-banner{
+      display:grid;
+      grid-template-columns:auto 1fr;
+      align-items:center;
+      gap:24px;
       position:relative;
     }
-    .hud-cluster{
-      display:flex;
-      align-items:center;
-      gap:18px;
-    }
-    .hud-cluster--column{
+    .hud-panel--controls{
       flex-direction:column;
       align-items:flex-end;
+      gap:16px;
     }
     .phase-stack{display:flex;flex-direction:column;gap:10px;}
     .phase-chip{
@@ -137,15 +156,11 @@
       color:var(--muted);
       letter-spacing:0.08em;
     }
-    .hud-divider{
-      width:2px;
-      height:48px;
-      background:linear-gradient(180deg,transparent 0%,rgba(56,205,255,0.75) 50%,transparent 100%);
-      opacity:0.65;
-    }
-    .status-banner{ 
-      min-height:50px;
-      min-width:280px;
+    .status-banner{
+      min-height:0;
+      min-width:0;
+      width:100%;
+      max-width:100%;
       padding:14px 22px;
       border-radius:18px;
       background:linear-gradient(120deg,rgba(9,30,52,0.95),rgba(7,46,79,0.72));
@@ -320,6 +335,7 @@
       box-shadow:0 14px 48px rgba(0,0,0,0.45);
       position:relative;
       overflow:hidden;
+      height:100%;
     }
     .join-banner::after{
       content:"";
@@ -846,34 +862,37 @@
     }
     @media (max-width:1280px){
       .layout{width:94vw;padding:24px 28px;}
+      header.hud-bar{gap:22px;}
       main.command-deck{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:"timer timer" "leaderboard history";}
-      .join-banner{grid-template-columns:auto minmax(0,1fr);}
     }
     @media (max-width:1040px){
-      :root{--hud-height:112px;}
-      header.hud-bar{flex-direction:column;align-items:flex-start;gap:18px;}
-      .hud-cluster--column{align-items:flex-start;text-align:left;}
-      .join-banner{grid-template-columns:minmax(0,1fr);text-align:left;}
+      header.hud-bar{grid-template-columns:1fr;gap:18px;}
+      .hud-panel{flex-direction:column;align-items:flex-start;text-align:left;gap:16px;}
+      .hud-panel.join-banner{grid-template-columns:minmax(0,1fr);text-align:left;}
       .join-banner__content{align-items:flex-start;}
       .join-banner__qr{justify-self:start;}
+      .status-banner{width:100%;}
+      .next-ready{align-items:flex-start;text-align:left;}
       main.command-deck{grid-template-columns:1fr;grid-template-areas:"timer" "leaderboard" "history";}
     }
     @media (max-width:820px){
       .layout{width:100vw;height:100vh;border-radius:0;border:none;padding:18px;}
-      .join-banner{grid-template-columns:minmax(0,1fr);row-gap:16px;text-align:center;}
+      header.hud-bar{gap:16px;}
+      .hud-panel{padding:16px 18px;}
+      .hud-panel.join-banner{row-gap:16px;text-align:center;justify-items:center;}
       .join-banner__content{text-align:center;align-items:center;}
+      .join-banner__qr{justify-self:center;}
       .timer-card{padding:32px 28px;}
       .timer-label{letter-spacing:0.18em;}
     }
     @media (max-width:640px){
       .layout{padding:16px;}
       .timer-value{font-size:clamp(3.1rem,11vw,4.4rem);}
-      .hud-cluster{width:100%;justify-content:space-between;}
-      .hud-divider{display:none;}
-      .next-ready{align-items:flex-start;text-align:left;}
-      .join-banner{padding:16px 18px;}
+      .hud-panel{gap:14px;}
+      .hud-panel.join-banner{padding:16px 18px;}
       .join-banner__qr{width:88px;height:88px;padding:8px;}
       .join-banner__content{gap:6px;align-items:center;}
+      .next-ready{align-items:flex-start;text-align:left;}
     }
   </style>
 </head>
@@ -881,30 +900,29 @@
   <div id="ambientField" aria-hidden="true"></div>
   <div class="layout">
     <header class="hud-bar">
-      <div class="hud-cluster">
+      <div class="hud-panel hud-panel--status">
         <div class="phase-stack">
           <div id="phaseLabel" class="phase-chip" aria-live="polite">Idle</div>
           <div class="round-info" id="roundInfo">Round 0 / 0</div>
         </div>
-        <div class="hud-divider" aria-hidden="true"></div>
         <div class="next-ready">
           <strong id="nextReadySummary">Next round queue inactive</strong>
           <div class="chip" id="nextReadyCountdown" style="display:none">00s</div>
         </div>
       </div>
-      <div class="hud-cluster hud-cluster--column">
+      <div class="hud-panel join-banner">
+        <img src="__QR_DATA__" alt="Join the game QR code" class="join-banner__qr"/>
+        <div class="join-banner__content">
+          <div class="join-banner__title">Join the Time-Bank Auction</div>
+          <p class="join-banner__hint">Scan to play or visit</p>
+          <p class="join-banner__url"><span class="join-banner__url-text">__JOIN_URL__</span></p>
+        </div>
+      </div>
+      <div class="hud-panel hud-panel--controls">
         <div id="statusBanner" class="status-banner hidden" aria-live="polite">Waiting for host…</div>
         <button id="audioToggle" class="hud-button" type="button" aria-pressed="false">Enable Audio</button>
       </div>
     </header>
-    <section class="join-banner">
-      <img src="__QR_DATA__" alt="Join the game QR code" class="join-banner__qr"/>
-      <div class="join-banner__content">
-        <div class="join-banner__title">Join the Time-Bank Auction</div>
-        <p class="join-banner__hint">Scan to play or visit</p>
-        <p class="join-banner__url"><span class="join-banner__url-text">__JOIN_URL__</span></p>
-      </div>
-    </section>
     <main class="command-deck">
       <section class="timer-card" aria-live="polite">
         <div class="timer-transition" aria-hidden="true"></div>
