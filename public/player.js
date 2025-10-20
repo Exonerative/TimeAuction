@@ -1037,12 +1037,30 @@
   });
 
   socket.on('game_started', (d={})=>{
-    const txt = (d && d.rulesText) ? String(d.rulesText).replace(/\n/g, ' \u2022 ') : 'Game started';
-    announceInline('Game started', txt, 4000);
-    exhausted = false; disabledUI = false; updateNextReadyUI();
+    const priorPhase = phase;
+    nextReadyState = { active:false, readyIds:[] };
+    setPhaseUI('idle');
+    roundActive = false;
+    inHold = false;
+    releasedOut = false;
+    exhausted = false;
+    disabledUI = false;
+    noHoldAnnouncedRound = null;
+    stopTimer();
+    cancelHeartbeat();
+    clearNoHoldVisual();
+    hideRoundRecap(true);
+    if (holdArea){ holdArea.classList.remove('bonus'); }
+    updateHoldVisual();
+    if (finalModal){ finalModal.classList.remove('show'); }
+    nextReadyCountdownCfg = null;
+    stopNextReadyCountdown();
+    if (nextReadyPanel){ nextReadyPanel.style.display='none'; nextReadyPanel.classList.remove('show'); nextReadyPanel.setAttribute('aria-hidden','true'); }
+    if (nextReadyCountdownPlayer){ nextReadyCountdownPlayer.style.display='none'; nextReadyCountdownPlayer.textContent=''; }
     latestLobby.started = true;
     latestLobby.roundActive = false;
     latestLobby.phase = 'idle';
+    latestLobby.currentRound = 0;
     if (d && d.rules){
       if (typeof d.rules.totalRounds === 'number'){ latestLobby.totalRounds = Number(d.rules.totalRounds); }
       if (typeof d.rules.timeBankMinutes === 'number'){
@@ -1051,6 +1069,9 @@
       }
     }
     updateMatchMeta();
+    const rulesSummary = (d && d.rulesText) ? String(d.rulesText).replace(/\n/g, ' \u2022 ') : 'Waiting for host…';
+    const title = priorPhase === 'ended' ? 'New match ready' : 'Game started';
+    announceInline(title, rulesSummary, 4000);
   });
 
   socket.on('round_result', (d={})=>{
