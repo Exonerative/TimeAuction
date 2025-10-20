@@ -43,6 +43,10 @@
   const phaseBadge = document.getElementById('phaseBadge');
   const phaseCopy  = document.getElementById('phaseCopy');
   const roundTimerEl = document.getElementById('roundTimer');
+  const roundStatusEl = document.getElementById('roundStatus');
+  const roundStatusDetailEl = document.getElementById('roundStatusDetail');
+  const timeBankValueEl = document.getElementById('timeBankValue');
+  const timeBankDetailEl = document.getElementById('timeBankDetail');
   const roundRecapPanel = document.getElementById('roundRecapPanel');
   const roundRecapTitle = document.getElementById('roundRecapTitle');
   const roundRecapSubtitle = document.getElementById('roundRecapSubtitle');
@@ -234,7 +238,8 @@
   let nextReadyCountdownCfg = null;
   let noHoldAnnouncedRound = null;
 
-  let latestLobby = { lobby: [], started:false, currentRound:0, totalRounds:0, roundActive:false, phase:'idle' };
+  let latestLobby = { lobby: [], started:false, currentRound:0, totalRounds:0, roundActive:false, phase:'idle', timeBankMinutes:null };
+  let startingTimeBankMinutes = null;
   const latestLobbyById = new Map();
   const latestLobbyByName = new Map();
   let myTokensKnown = 0;
@@ -382,9 +387,89 @@
 
   function numberOrNull(val){ const n = Number(val); return Number.isFinite(n) ? n : null; }
   function formatTokens(val){ const n = numberOrNull(val); if (n == null) return '—'; return n + ' token' + (n === 1 ? '' : 's'); }
+  function formatTimeBankMinutes(minutes){
+    const raw = Number(minutes);
+    if (!Number.isFinite(raw)) return null;
+    const totalSeconds = Math.max(0, Math.round(raw * 60));
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    if (secs === 0) return mins + ' min';
+    if (mins === 0) return secs + ' sec';
+    return mins + ' min ' + secs + ' sec';
+  }
+
+  function describePhaseTag(tag, { started=false, active=false }={}){
+    switch(tag){
+      case 'arming': return 'Arming players';
+      case 'countdown': return 'Countdown';
+      case 'active': return 'Round in progress';
+      case 'exhausted': return 'Bank exhausted';
+      case 'ended': return started ? 'Round ended' : 'Match complete';
+      default:
+        if (active) return 'Round in progress';
+        return started ? 'Between rounds' : 'Waiting to start';
+    }
+  }
+
+  function updateMatchMeta(){
+    const started = !!(latestLobby && latestLobby.started);
+    const totalRounds = Number(latestLobby && latestLobby.totalRounds) || 0;
+    const currentRound = Number(latestLobby && latestLobby.currentRound) || 0;
+    const roundIsActive = !!(roundActive || (latestLobby && latestLobby.roundActive));
+    const phaseTag = phase || (latestLobby && latestLobby.phase) || 'idle';
+
+    let roundText = started ? 'Match in progress' : 'Waiting for host';
+    let roundDetail = '';
+
+    if (totalRounds > 0){
+      if (!started && currentRound === 0){
+        roundText = `Round 1 of ${totalRounds}`;
+        roundDetail = 'Waiting to start';
+      } else if (phaseTag === 'idle' && !roundIsActive){
+        if (currentRound >= totalRounds){
+          roundText = `Match complete · ${totalRounds} rounds`;
+          roundDetail = 'Awaiting new match';
+        } else {
+          const nextRound = Math.min(totalRounds, Math.max(1, currentRound + (started ? 1 : 0)));
+          if (currentRound <= 0){
+            roundText = `Round 1 of ${totalRounds}`;
+            roundDetail = 'Waiting to start';
+          } else {
+            roundText = `Next: Round ${nextRound} of ${totalRounds}`;
+            roundDetail = `Last round: #${currentRound}`;
+          }
+        }
+      } else {
+        const displayRound = currentRound > 0 ? currentRound : Math.min(totalRounds, 1);
+        roundText = `Round ${displayRound} of ${totalRounds}`;
+        roundDetail = describePhaseTag(phaseTag, { started, active: roundIsActive });
+      }
+    } else if (started){
+      roundDetail = describePhaseTag(phaseTag, { started, active: roundIsActive });
+    }
+
+    if (roundStatusEl){ roundStatusEl.textContent = roundText; }
+    if (roundStatusDetailEl){
+      roundStatusDetailEl.textContent = roundDetail || '';
+      roundStatusDetailEl.style.display = roundDetail ? '' : 'none';
+    }
+
+    const fallbackBank = (latestLobby && typeof latestLobby.timeBankMinutes === 'number') ? Number(latestLobby.timeBankMinutes) : null;
+    const bankMinutes = (startingTimeBankMinutes != null && Number.isFinite(Number(startingTimeBankMinutes))) ? Number(startingTimeBankMinutes) : fallbackBank;
+    if (timeBankValueEl){
+      if (bankMinutes != null && Number.isFinite(bankMinutes)){
+        const formatted = formatTimeBankMinutes(bankMinutes) || (bankMinutes + ' min');
+        timeBankValueEl.textContent = formatted;
+        if (timeBankDetailEl){ timeBankDetailEl.style.display = 'block'; }
+      } else {
+        timeBankValueEl.textContent = '—';
+        if (timeBankDetailEl){ timeBankDetailEl.style.display = 'none'; }
+      }
+    }
+  }
 
   function rebuildLobbySnapshot(payload){
-    const prev = latestLobby || { currentRound:0, totalRounds:0, phase:'idle' };
+    const prev = latestLobby || { currentRound:0, totalRounds:0, phase:'idle', timeBankMinutes:null };
     latestLobbyById.clear();
     latestLobbyByName.clear();
     const list = (payload && Array.isArray(payload.lobby)) ? payload.lobby : [];
@@ -408,7 +493,12 @@
       totalRounds: (payload && typeof payload.totalRounds === 'number') ? payload.totalRounds : (prev.totalRounds || 0),
       roundActive: !!(payload && payload.roundActive),
       phase: (payload && payload.phase) || prev.phase || 'idle',
+      timeBankMinutes: (payload && typeof payload.timeBankMinutes === 'number') ? Number(payload.timeBankMinutes) : prev.timeBankMinutes,
     };
+    if (typeof latestLobby.timeBankMinutes === 'number' && Number.isFinite(latestLobby.timeBankMinutes)){
+      startingTimeBankMinutes = latestLobby.timeBankMinutes;
+    }
+    updateMatchMeta();
   }
 
   function getMyLobbyEntry(){ return myId ? (latestLobbyById.get(myId) || null) : null; }
@@ -418,6 +508,8 @@
     if (typeof data.round === 'number'){ latestLobby.currentRound = data.round; }
     if (typeof data.totalRounds === 'number'){ latestLobby.totalRounds = data.totalRounds; }
     if (typeof data.roundsLeft === 'number'){ latestLobby.roundsLeft = data.roundsLeft; }
+    latestLobby.roundActive = false;
+    latestLobby.phase = 'idle';
     if (data.winner && typeof data.winnerTokens === 'number'){
       const winnerEntry = latestLobbyByName.get(data.winner);
       if (winnerEntry){ winnerEntry.tokens = numberOrNull(data.winnerTokens) ?? winnerEntry.tokens; }
@@ -426,6 +518,7 @@
       const leaderEntry = latestLobbyByName.get(data.leaderName);
       if (leaderEntry){ leaderEntry.tokens = numberOrNull(data.leaderTokens) ?? leaderEntry.tokens; }
     }
+    updateMatchMeta();
   }
 
   function buildRoundRecapModel(data){
@@ -642,6 +735,7 @@
         phaseCopy.textContent  = 'Waiting for host…';
     }
     updateNextReadyUI();
+    updateMatchMeta();
   }
 
   function updateHoldVisual(){
@@ -755,6 +849,10 @@
     myTokensKnown = numberOrNull(d.tokens) ?? 0;
     myPinEl.textContent = d.pin || '';
     if (pinInput){ pinInput.value = d.pin || ''; }
+    if (typeof d.timeBankMinutes === 'number' && Number.isFinite(d.timeBankMinutes)){
+      startingTimeBankMinutes = Number(d.timeBankMinutes);
+      latestLobby.timeBankMinutes = startingTimeBankMinutes;
+    }
     if (d.sessionToken){
       sessionInfo = { pin: d.pin, name: d.name, sessionToken: d.sessionToken };
       saveSession(sessionInfo);
@@ -771,6 +869,7 @@
     askNotifyPermission();
     setPhaseUI('idle'); updateHoldVisual(); stopTimer(); cancelHeartbeat();
     updateNextReadyUI();
+    updateMatchMeta();
   });
   socket.on('reconnect_result', (r)=>{
     if (!r.ok){ setStatus(r.error || 'Reconnect failed.'); alert(r.error || 'Reconnect failed'); return; }
@@ -806,6 +905,9 @@
     if (roundResult) roundResult.textContent='';
     if (exhausted){ disabledUI=false; try{ phaseCopy.textContent='Bank exhausted — press & hold to arm the next round (you can’t play).'; }catch(e){} }
     setPhaseUI('arming'); roundActive=false; releasedOut=false; disabledUI=false; updateHoldVisual(); stopTimer(); cancelHeartbeat(); notify('Round starting','Press & hold now — all players must hold.');
+    latestLobby.phase = 'arming';
+    latestLobby.roundActive = false;
+    updateMatchMeta();
   });
 
   // Countdown 3,2,1,0 with unified activationTs
@@ -814,6 +916,9 @@
     hideRoundRecap(true);
     setPhaseUI('countdown'); if (exhausted){ disabledUI=false; try{ phaseCopy.textContent='Countdown — you’re exhausted and won’t play this round.';}catch(e){} } updateHoldVisual();
     activationTs = (d.startTs||serverNow()) + (d.durationMs||0);
+    latestLobby.phase = 'countdown';
+    latestLobby.roundActive = false;
+    updateMatchMeta();
     function draw(){
       const remain = Math.max(0, activationTs - serverNow());
       const raw = Math.floor((remain + 999) / 1000); // 3,2,1,0
@@ -832,6 +937,11 @@
     hideRoundRecap(true);
     const ts = activationTs || (d.startTs + (d.durationMs||0)) || serverNow();
     const delay = Math.max(0, ts - serverNow());
+    if (typeof d.round === 'number'){ latestLobby.currentRound = d.round; }
+    latestLobby.phase = 'active';
+    latestLobby.roundActive = true;
+    latestLobby.started = true;
+    updateMatchMeta();
     setTimeout(()=>{
       setPhaseUI('active'); roundActive=true; releasedOut=false;
       if (exhausted){ disabledUI=true; }
@@ -860,6 +970,17 @@
     const txt = (d && d.rulesText) ? String(d.rulesText).replace(/\n/g, ' \u2022 ') : 'Game started';
     announceInline('Game started', txt, 4000);
     exhausted = false; disabledUI = false; updateNextReadyUI();
+    latestLobby.started = true;
+    latestLobby.roundActive = false;
+    latestLobby.phase = 'idle';
+    if (d && d.rules){
+      if (typeof d.rules.totalRounds === 'number'){ latestLobby.totalRounds = Number(d.rules.totalRounds); }
+      if (typeof d.rules.timeBankMinutes === 'number'){
+        startingTimeBankMinutes = Number(d.rules.timeBankMinutes);
+        latestLobby.timeBankMinutes = startingTimeBankMinutes;
+      }
+    }
+    updateMatchMeta();
   });
 
   socket.on('round_result', (d={})=>{
@@ -910,6 +1031,10 @@
     hideRoundRecap(true);
     clearNoHoldVisual();
     setPhaseUI('ended');
+    latestLobby.roundActive = false;
+    latestLobby.phase = 'ended';
+    latestLobby.started = false;
+    updateMatchMeta();
     // Winner banner
     if (d.champion){ finalChampion.textContent = 'Champion: '+d.champion.name+' ('+d.champion.tokens+')'; }
     else { finalChampion.textContent = 'Champion: —'; }

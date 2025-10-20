@@ -356,7 +356,15 @@ function broadcastPublicScoreboard(){
 // --------------------------- Host & Lobby ---------------------------
 function broadcastLobby(){
   const lobbyPublic = Object.values(state.players).filter(p=>p.joined).map(p => ({ id:p.id, name:p.name, tokens:p.tokens, exhausted:p.exhausted }));
-  io.emit('lobby_update', { lobby: lobbyPublic, started: state.started, currentRound: state.currentRound, totalRounds: state.settings.totalRounds, roundActive: state.roundActive, phase: state.phase });
+  io.emit('lobby_update', {
+    lobby: lobbyPublic,
+    started: state.started,
+    currentRound: state.currentRound,
+    totalRounds: state.settings.totalRounds,
+    roundActive: state.roundActive,
+    phase: state.phase,
+    timeBankMinutes: state.settings.timeBankMinutes,
+  });
 }
 function emitHostStatus(){
   emitPresentationState();
@@ -757,6 +765,7 @@ io.on('connection', (socket) => {
         totalRounds: state.settings.totalRounds,
         countdownSeconds: Math.round((state.countdownMs||5000)/1000),
         bonus: state.settings.bonus || {enabled:false},
+        timeBankMinutes: state.settings.timeBankMinutes,
         finalRoundTokens: roundTokenValue(state.settings.totalRounds),
         autoEnd: true
       };
@@ -882,7 +891,7 @@ io.on('connection', (socket) => {
     p.name = safe; p.joined = true;
     if (!p.pin){ p.pin = assignPinUnique(); state.pinIndex.set(p.pin, p.id); }
     refreshPlayerSessionToken(p);
-    socket.emit('joined', { id: p.id, name: p.name, tokens: p.tokens, pin: p.pin, sessionToken: p.sessionToken });
+    socket.emit('joined', { id: p.id, name: p.name, tokens: p.tokens, pin: p.pin, sessionToken: p.sessionToken, timeBankMinutes: state.settings.timeBankMinutes });
     if (state.phase==='arming'){ /* will join next round */ }
     broadcastLobby();
     updateNextRoundReadyState();
@@ -903,7 +912,7 @@ io.on('connection', (socket) => {
     if (!moved){ socket.emit('reconnect_result', { ok:false, error:'Rebind failed' }); return; }
     moved.joined = true;
     refreshPlayerSessionToken(moved);
-    socket.emit('joined', { id: moved.id, name: moved.name, tokens: moved.tokens, pin: moved.pin, sessionToken: moved.sessionToken });
+    socket.emit('joined', { id: moved.id, name: moved.name, tokens: moved.tokens, pin: moved.pin, sessionToken: moved.sessionToken, timeBankMinutes: state.settings.timeBankMinutes });
     socket.emit('reconnect_result', { ok:true, name:moved.name, tokens:moved.tokens, pin:moved.pin });
     broadcastLobby();
     updateNextRoundReadyState();
@@ -923,11 +932,11 @@ io.on('connection', (socket) => {
     if (!moved){ if (typeof ack==='function') ack({ ok:false, error:'Resume failed' }); return; }
     moved.joined = true;
     refreshPlayerSessionToken(moved);
-    socket.emit('joined', { id: moved.id, name: moved.name, tokens: moved.tokens, pin: moved.pin, sessionToken: moved.sessionToken });
+    socket.emit('joined', { id: moved.id, name: moved.name, tokens: moved.tokens, pin: moved.pin, sessionToken: moved.sessionToken, timeBankMinutes: state.settings.timeBankMinutes });
     broadcastLobby();
     updateNextRoundReadyState();
     emitHostStatus(); broadcastPublicScoreboard();
-    if (typeof ack==='function') ack({ ok:true, id: moved.id, name: moved.name, tokens: moved.tokens, pin: moved.pin, sessionToken: moved.sessionToken });
+    if (typeof ack==='function') ack({ ok:true, id: moved.id, name: moved.name, tokens: moved.tokens, pin: moved.pin, sessionToken: moved.sessionToken, timeBankMinutes: state.settings.timeBankMinutes });
   });
 
   socket.on('player_ready_next', ()=>{
