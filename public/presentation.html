@@ -454,7 +454,8 @@
       display:flex;
       justify-content:space-between;
       gap:18px;
-      align-items:center;
+      align-items:flex-start;
+      flex-wrap:wrap;
       position:relative;
       overflow:hidden;
     }
@@ -472,10 +473,54 @@
       background:linear-gradient(100deg,transparent,rgba(246,165,93,0.2),transparent);
       animation:statusSweep 1.6s ease;
     }
-    .history-item .details{display:flex;flex-direction:column;gap:4px;}
+    .history-item .details{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0;}
     .history-item .round{font-weight:700;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase;}
     .history-item .winner{font-size:1.05rem;font-weight:600;}
     .history-item .meta{font-size:0.95rem;color:var(--muted);letter-spacing:0.05em;}
+    .hold-stat{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      align-items:flex-end;
+      text-align:right;
+      min-width:180px;
+      flex-shrink:0;
+    }
+    .hold-label{
+      font-size:0.75rem;
+      letter-spacing:0.26em;
+      text-transform:uppercase;
+      color:rgba(148,187,205,0.72);
+    }
+    .hold-value{
+      font-size:clamp(1.3rem,2.4vw,1.9rem);
+      font-weight:700;
+      line-height:1.1;
+      color:var(--text);
+      white-space:nowrap;
+    }
+    .hold-value .duration-number{
+      color:var(--accent);
+      font-family:"Orbitron","Inter",system-ui,sans-serif;
+      font-weight:700;
+      letter-spacing:0.06em;
+    }
+    .hold-value .duration-unit{
+      color:rgba(148,187,205,0.88);
+      font-weight:500;
+      letter-spacing:0.08em;
+      text-transform:uppercase;
+    }
+    .hold-stat--empty .hold-value{
+      color:rgba(148,187,205,0.78);
+      font-size:1.05rem;
+      font-weight:500;
+      letter-spacing:0.08em;
+      text-transform:uppercase;
+    }
+    .history-item.no-hold .hold-stat--empty .hold-value{
+      color:rgba(255,214,214,0.88);
+    }
     .empty-note{color:var(--muted);font-style:italic;letter-spacing:0.08em;}
     .empty-note::before{content:"// ";opacity:0.5;}
     .vignette{
@@ -519,6 +564,27 @@
     }
     .winner-spotlight.active .spotlight-core{
       animation:spotlightReveal 0.85s cubic-bezier(0.23,1,0.32,1);
+    }
+    @media (max-width:1080px){
+      .history-item{
+        flex-direction:column;
+        align-items:flex-start;
+        gap:14px;
+      }
+      .hold-stat{
+        align-items:flex-start;
+        text-align:left;
+        width:100%;
+        min-width:unset;
+      }
+      .hold-value{
+        white-space:normal;
+      }
+    }
+    @media (max-width:720px){
+      .hold-value{
+        font-size:clamp(1.2rem,4.2vw,1.6rem);
+      }
     }
     .winner-spotlight .spotlight-core::before,
     .winner-spotlight .spotlight-core::after{
@@ -574,9 +640,10 @@
     }
     .spotlight-stats{
       display:flex;
-      gap:18px;
+      gap:22px;
       justify-content:center;
-      margin-top:12px;
+      align-items:flex-end;
+      margin-top:16px;
       font-weight:600;
       letter-spacing:0.08em;
       color:var(--muted);
@@ -585,6 +652,39 @@
     .winner-spotlight.no-hold .spotlight-stats span{color:#ffd6db;}
     .spotlight-stats strong{font-size:1.1rem;color:#f8fafc;}
     .winner-spotlight.no-hold .spotlight-stats strong{color:#ffe5ea;}
+    .spotlight-hold-label{
+      font-size:0.78rem;
+      letter-spacing:0.28em;
+      text-transform:uppercase;
+      color:rgba(248,250,252,0.7);
+    }
+    .spotlight-hold-value{
+      display:flex;
+      align-items:baseline;
+      gap:6px;
+      font-size:1.1rem;
+      font-weight:600;
+      color:#f8fafc;
+    }
+    .spotlight-hold-value--empty{
+      color:rgba(248,250,252,0.65);
+      text-transform:uppercase;
+      letter-spacing:0.12em;
+      font-size:0.95rem;
+    }
+    .spotlight-hold-value .duration-number{
+      color:var(--accent);
+      font-family:"Orbitron","Inter",system-ui,sans-serif;
+      font-weight:700;
+      letter-spacing:0.08em;
+    }
+    .spotlight-hold-value .duration-unit{
+      color:rgba(248,250,252,0.75);
+      font-weight:500;
+      letter-spacing:0.08em;
+      text-transform:uppercase;
+    }
+    .winner-spotlight.no-hold .spotlight-hold-value{color:#ffe5ea;}
     .spotlight-footer{
       margin-top:28px;
       font-size:0.9rem;
@@ -769,7 +869,10 @@
       <div class="spotlight-name" id="spotlightWinnerName">—</div>
       <div class="spotlight-stats">
         <span id="spotlightTokens"><strong>0</strong>🪙</span>
-        <span id="spotlightHold"><strong>0s</strong> hold</span>
+        <span id="spotlightHold">
+          <span class="spotlight-hold-label">Hold</span>
+          <span class="spotlight-hold-value"><span class="duration-number">0.0</span><span class="duration-unit"> seconds</span></span>
+        </span>
       </div>
       <div class="spotlight-footer" id="spotlightFooter">Prepare for the next challenge</div>
     </div>
