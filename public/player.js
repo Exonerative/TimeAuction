@@ -241,8 +241,25 @@
   });
 
   const finalModal = document.getElementById('finalModal');
-  const finalChampion = document.getElementById('finalChampion');
-  const finalTableInner = document.getElementById('finalTableInner');
+  const finalCard = document.getElementById('finalCard');
+  const finalChampionName = document.getElementById('finalChampionName');
+  const finalChampionTokens = document.getElementById('finalChampionTokens');
+  const finalChampionMeta = document.getElementById('finalChampionMeta');
+  const finalChampionBadge = document.getElementById('finalChampionBadge');
+  const finalChampionBadgeInitial = document.getElementById('finalChampionBadgeInitial');
+  const finalLeaderboardBody = document.getElementById('finalLeaderboardBody');
+  const finalPodiumFirstName = document.getElementById('finalPodiumFirstName');
+  const finalPodiumFirstTokens = document.getElementById('finalPodiumFirstTokens');
+  const finalPodiumFirstStat = document.getElementById('finalPodiumFirstStat');
+  const finalPodiumSecondName = document.getElementById('finalPodiumSecondName');
+  const finalPodiumSecondTokens = document.getElementById('finalPodiumSecondTokens');
+  const finalPodiumSecondStat = document.getElementById('finalPodiumSecondStat');
+  const finalPodiumThirdName = document.getElementById('finalPodiumThirdName');
+  const finalPodiumThirdTokens = document.getElementById('finalPodiumThirdTokens');
+  const finalPodiumThirdStat = document.getElementById('finalPodiumThirdStat');
+  const finalPodiumFirstItem = document.querySelector('.final-podium__item--first');
+  const finalPodiumSecondItem = document.querySelector('.final-podium__item--second');
+  const finalPodiumThirdItem = document.querySelector('.final-podium__item--third');
   const closeFinal = document.getElementById('closeFinal');
 
   let joined=false, inHold=false, exhausted=false, roundActive=false, releasedOut=false, disabledUI=false, phase='idle', myId=null;
@@ -1164,34 +1181,153 @@
     latestLobby.phase = 'ended';
     latestLobby.started = false;
     updateMatchMeta();
-    // Winner banner
-    if (d.champion){ finalChampion.textContent = 'Champion: '+d.champion.name+' ('+d.champion.tokens+')'; }
-    else { finalChampion.textContent = 'Champion: —'; }
-    // Build final table for players — includes Bank Remaining (formatted) visible ONLY here
-    const rows = (d.final||[]).map(r=>{
-      const bankFmt = fmt(r.bankRemainingMs||0);
-      const lastWin = (r.lastVictoryRound==null) ? 'no victories yet' : ('#'+r.lastVictoryRound);
-      const exhausted = (r.exhausted || (r.bankRemainingMs||0)===0);
-      return '<tr>'+
-        '<td class="mono">#'+r.rank+'</td>'+
-        '<td>'+escapeHtml(String(r.name||''))+'</td>'+
-        '<td>'+(r.tokens||0)+'</td>'+
-        '<td>'+(r.roundsActive||0)+'</td>'+
-        '<td class="mono">'+bankFmt+(exhausted?' <span class="muted">(exhausted)</span>':'')+'</td>'+
-        '<td>'+lastWin+'</td>'+
-      '</tr>';
-    }).join('');
-    finalTableInner.innerHTML =
-      '<table>'+
-        '<thead><tr><th>#</th><th>Player</th><th></th><th>Rounds Active</th><th>Bank Remaining</th><th>Last Win</th></tr></thead>'+
-        '<tbody>'+rows+'</tbody>'+
-      '</table>';
-    finalModal.classList.add('show');
+    const finalRows = Array.isArray(d && d.final) ? d.final.slice() : [];
+    finalRows.sort((a,b)=>{
+      const ar = (a && Number.isFinite(a.rank)) ? a.rank : Number.MAX_SAFE_INTEGER;
+      const br = (b && Number.isFinite(b.rank)) ? b.rank : Number.MAX_SAFE_INTEGER;
+      return ar - br;
+    });
+    const findByRank = (rank)=> finalRows.find(r=>Number.isFinite(r?.rank) && r.rank === rank);
+    const championSource = findByRank(1) || finalRows[0] || null;
+    const championData = (d && d.champion) ? Object.assign({}, championSource || {}, d.champion) : championSource;
+
+    const championName = (championData && championData.name) ? String(championData.name) : '—';
+    if (finalChampionName){ finalChampionName.textContent = championName; }
+
+    const rawChampionTokens = (championData && championData.tokens != null) ? championData.tokens : null;
+    const championTokensNumber = (typeof rawChampionTokens === 'number' && Number.isFinite(rawChampionTokens)) ? rawChampionTokens : null;
+    if (finalChampionTokens){
+      if (championTokensNumber != null){
+        finalChampionTokens.textContent = `🏆 ${championTokensNumber} victory token${championTokensNumber === 1 ? '' : 's'}`;
+      } else if (rawChampionTokens != null){
+        finalChampionTokens.textContent = `🏆 ${rawChampionTokens}`;
+      } else {
+        finalChampionTokens.textContent = '🏆 —';
+      }
+    }
+
+    if (finalChampionMeta){
+      if (championData){
+        const bankKnown = typeof championData.bankRemainingMs === 'number';
+        const bankText = bankKnown ? fmt(championData.bankRemainingMs) : '—';
+        const exhausted = !!championData.exhausted || (bankKnown && championData.bankRemainingMs === 0);
+        const lastWinLabel = (championData.lastVictoryRound != null)
+          ? `Last win #${championData.lastVictoryRound}`
+          : 'No victories yet';
+        let meta = `Bank: ${bankText}`;
+        if (exhausted && bankKnown){ meta += ' · Exhausted'; }
+        meta += ` · ${lastWinLabel}`;
+        finalChampionMeta.textContent = meta;
+      } else {
+        finalChampionMeta.textContent = 'Awaiting match data…';
+      }
+    }
+
+    if (finalChampionBadgeInitial){
+      const initial = (championName && championName !== '—') ? championName.trim().charAt(0).toUpperCase() : '★';
+      finalChampionBadgeInitial.textContent = initial || '★';
+    }
+
+    const podiumSlots = [
+      { entry: findByRank(2) || finalRows[1] || null, nameEl: finalPodiumSecondName, tokensEl: finalPodiumSecondTokens, statEl: finalPodiumSecondStat, itemEl: finalPodiumSecondItem, label: 'Second place' },
+      { entry: findByRank(1) || finalRows[0] || null, nameEl: finalPodiumFirstName, tokensEl: finalPodiumFirstTokens, statEl: finalPodiumFirstStat, itemEl: finalPodiumFirstItem, label: 'First place' },
+      { entry: findByRank(3) || finalRows[2] || null, nameEl: finalPodiumThirdName, tokensEl: finalPodiumThirdTokens, statEl: finalPodiumThirdStat, itemEl: finalPodiumThirdItem, label: 'Third place' },
+    ];
+
+    const formatTokensShort = (entry)=>{
+      if (!entry) return '🏆 —';
+      const value = entry.tokens;
+      if (typeof value === 'number' && Number.isFinite(value)) return `🏆 ${value}`;
+      if (value != null) return `🏆 ${value}`;
+      return '🏆 —';
+    };
+    const describeTokens = (entry)=>{
+      if (!entry) return 'no recorded tokens';
+      const value = entry.tokens;
+      if (typeof value === 'number' && Number.isFinite(value)){
+        return `${value} victory token${value === 1 ? '' : 's'}`;
+      }
+      if (value != null){ return `${value} victory tokens`; }
+      return 'no recorded tokens';
+    };
+    const formatBankLine = (entry)=>{
+      if (!entry) return 'Bank: —';
+      const bankKnown = typeof entry.bankRemainingMs === 'number';
+      const bankText = bankKnown ? fmt(entry.bankRemainingMs) : '—';
+      const exhausted = !!entry.exhausted || (bankKnown && entry.bankRemainingMs === 0);
+      const lastWinLabel = (entry.lastVictoryRound != null) ? `Last win #${entry.lastVictoryRound}` : 'No victories yet';
+      let line = `Bank: ${bankText}`;
+      if (exhausted && bankKnown){ line += ' · Exhausted'; }
+      line += ` · ${lastWinLabel}`;
+      return line;
+    };
+    const updatePodiumSlot = ({ entry, nameEl, tokensEl, statEl, itemEl, label })=>{
+      if (nameEl){ nameEl.textContent = entry && entry.name ? entry.name : '—'; }
+      if (tokensEl){ tokensEl.textContent = formatTokensShort(entry); }
+      if (statEl){ statEl.textContent = formatBankLine(entry); }
+      if (itemEl){
+        const ariaLabel = entry ? `${label}: ${entry.name || 'Unknown'} with ${describeTokens(entry)}` : `${label}: awaiting player`;
+        itemEl.setAttribute('aria-label', ariaLabel);
+      }
+    };
+    podiumSlots.forEach(updatePodiumSlot);
+
+    if (finalLeaderboardBody){
+      if (finalRows.length){
+        const rows = finalRows.map(r=>{
+          const rankVal = Number.isFinite(r?.rank) ? r.rank : '—';
+          const nameVal = escapeHtml(String(r?.name || ''));
+          const tokensVal = Number.isFinite(r?.tokens) ? r.tokens : (r?.tokens != null ? r.tokens : '—');
+          const roundsVal = Number.isFinite(r?.roundsActive) ? r.roundsActive : (r?.roundsActive != null ? r.roundsActive : '—');
+          const bankKnown = typeof r?.bankRemainingMs === 'number';
+          const bankText = bankKnown ? fmt(r.bankRemainingMs) : '—';
+          const exhausted = !!r?.exhausted || (bankKnown && r.bankRemainingMs === 0);
+          const bankCell = escapeHtml(String(bankText)) + (exhausted ? ' <span class="muted">(exhausted)</span>' : '');
+          const lastWinCell = (r?.lastVictoryRound != null)
+            ? '#'+escapeHtml(String(r.lastVictoryRound))
+            : '<span class="muted">No victories yet</span>';
+          return '<tr>'+
+            '<td class="mono">#'+escapeHtml(String(rankVal))+'</td>'+
+            '<td>'+nameVal+'</td>'+
+            '<td class="mono">'+escapeHtml(String(tokensVal))+'</td>'+
+            '<td>'+escapeHtml(String(roundsVal))+'</td>'+
+            '<td class="mono">'+bankCell+'</td>'+
+            '<td>'+lastWinCell+'</td>'+
+          '</tr>';
+        }).join('');
+        finalLeaderboardBody.innerHTML =
+          '<table>'+
+            '<thead><tr><th class="mono">Rank</th><th>Player</th><th class="mono">🏆</th><th>Rounds Active</th><th class="mono">Bank Reserve</th><th>Last Victory</th></tr></thead>'+
+            '<tbody>'+rows+'</tbody>'+
+          '</table>';
+      } else {
+        finalLeaderboardBody.innerHTML = '<div class="final-leaderboard__empty">Final standings unavailable.</div>';
+      }
+      finalLeaderboardBody.scrollTop = 0;
+    }
+
+    if (finalCard){ finalCard.classList.remove('final-card--animate'); }
+    if (finalChampionBadge){ finalChampionBadge.classList.remove('final-champion__badge--active'); }
+    if (finalModal){ finalModal.classList.add('show'); }
+    if (finalCard){ void finalCard.offsetWidth; finalCard.classList.add('final-card--animate'); }
+    if (championData && finalChampionBadge){
+      void finalChampionBadge.offsetWidth;
+      finalChampionBadge.classList.add('final-champion__badge--active');
+    }
+
     requestAnimationFrame(()=>{
-      closeFinal.focus({ preventScroll: true });
+      if (closeFinal){
+        try{ closeFinal.focus({ preventScroll: true }); }catch(e){}
+      }
     });
   });
-  closeFinal.onclick = ()=>{ finalModal.classList.remove('show'); };
+  if (closeFinal){
+    closeFinal.onclick = ()=>{
+      if (finalModal){ finalModal.classList.remove('show'); }
+      if (finalCard){ finalCard.classList.remove('final-card--animate'); }
+      if (finalChampionBadge){ finalChampionBadge.classList.remove('final-champion__badge--active'); }
+    };
+  }
 
   socket.on('exhausted', ()=>{ setPhaseUI('exhausted'); exhausted=true; inHold=false; disabledUI=true; updateHoldVisual(); vibrate(80); exhaustedMsg.style.display='block'; setTimeout(()=>exhaustedMsg.style.display='none', 2500); updateNextReadyUI(); });
 
