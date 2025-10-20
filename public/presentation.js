@@ -379,7 +379,6 @@
       return;
     }
     historyEmpty.style.display = 'none';
-    historyList.style.display = 'flex';
     items.forEach((entry)=>{
       const li = document.createElement('li');
       li.className = 'history-item';
@@ -440,6 +439,7 @@
       li.classList.add('enter');
       setTimeout(()=> li.classList.remove('enter'), 1800);
     });
+    historyList.style.display = 'grid';
   }
 
   function applyState(patch){
