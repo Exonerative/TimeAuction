@@ -879,6 +879,174 @@
       0%{background-position:0 0,0 0,0 0;}
       100%{background-position:200px 180px,-180px -160px,240px 200px;}
     }
+    .champion-fanfare{
+      position:absolute;
+      inset:-1px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      pointer-events:none;
+      opacity:0;
+      transform:scale(1.02);
+      transition:opacity 0.6s ease,transform 0.8s cubic-bezier(0.23,1,0.32,1);
+      z-index:40;
+    }
+    .champion-fanfare.active{
+      pointer-events:auto;
+      opacity:1;
+      transform:scale(1);
+    }
+    .champion-fanfare__backdrop{
+      position:absolute;
+      inset:0;
+      background:
+        radial-gradient(120% 120% at 50% 40%,rgba(11,94,138,0.55),transparent 70%),
+        radial-gradient(120% 120% at 50% 60%,rgba(255,148,77,0.45),transparent 80%),
+        linear-gradient(140deg,rgba(2,10,18,0.94),rgba(5,32,54,0.9));
+      backdrop-filter:blur(16px);
+      border:1px solid rgba(45,180,255,0.32);
+      border-radius:32px;
+      box-shadow:0 48px 120px rgba(0,0,0,0.65);
+      overflow:hidden;
+      animation:fanfareGlow 12s ease-in-out infinite;
+    }
+    .champion-fanfare__backdrop::before,
+    .champion-fanfare__backdrop::after{
+      content:"";
+      position:absolute;
+      inset:-120px;
+      background:radial-gradient(65% 65% at 50% 50%,rgba(56,213,255,0.2),transparent 75%);
+      mix-blend-mode:screen;
+      animation:fanfarePulse 6s ease-in-out infinite;
+    }
+    .champion-fanfare__backdrop::after{
+      animation-delay:3s;
+    }
+    .champion-fanfare__core{
+      position:relative;
+      width:min(920px,92vw);
+      padding:60px clamp(32px,6vw,72px);
+      display:grid;
+      gap:32px;
+      text-align:center;
+      color:var(--text);
+      font-family:"Orbitron", "Inter", sans-serif;
+    }
+    .champion-fanfare__orbit{
+      position:absolute;
+      inset:-160px;
+      pointer-events:none;
+      border-radius:50%;
+      background:conic-gradient(from 90deg,rgba(56,213,255,0.08),rgba(246,165,93,0.16),transparent 55%);
+      filter:blur(18px);
+      animation:orbitSpin 18s linear infinite;
+    }
+    .champion-fanfare__title{
+      letter-spacing:0.24em;
+      text-transform:uppercase;
+      font-size:1.05rem;
+      color:rgba(148,187,205,0.9);
+    }
+    .champion-fanfare__champion{
+      font-size:clamp(2.8rem,6vw,4rem);
+      font-weight:700;
+      letter-spacing:0.08em;
+      text-transform:uppercase;
+      color:#f8fafc;
+      text-shadow:0 12px 32px rgba(0,0,0,0.65);
+    }
+    .champion-fanfare__tokens{
+      display:inline-flex;
+      align-items:baseline;
+      gap:12px;
+      justify-content:center;
+      padding:14px 24px;
+      border-radius:999px;
+      background:linear-gradient(120deg,rgba(56,213,255,0.28),rgba(246,165,93,0.32));
+      border:1px solid rgba(56,213,255,0.4);
+      font-size:1.4rem;
+      font-weight:600;
+      letter-spacing:0.12em;
+      box-shadow:0 18px 64px rgba(0,0,0,0.45);
+    }
+    .champion-fanfare__tokens strong{
+      font-size:clamp(2rem,5vw,2.8rem);
+      letter-spacing:0.06em;
+    }
+    .champion-fanfare__tokens span{opacity:0.85;font-size:1rem;letter-spacing:0.2em;text-transform:uppercase;}
+    .champion-fanfare__podium{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:18px;
+    }
+    .champion-fanfare__podium li{
+      list-style:none;
+      padding:18px 16px;
+      border-radius:18px;
+      background:linear-gradient(140deg,rgba(9,28,48,0.85),rgba(5,20,34,0.72));
+      border:1px solid rgba(56,213,255,0.28);
+      box-shadow:0 18px 48px rgba(0,0,0,0.35);
+      display:grid;
+      gap:10px;
+      font-family:"Inter",system-ui,sans-serif;
+      position:relative;
+    }
+    .champion-fanfare__podium-empty{
+      justify-items:center;
+      letter-spacing:0.14em;
+      color:rgba(148,187,205,0.78);
+      text-transform:uppercase;
+      padding:28px 18px;
+    }
+    .champion-fanfare__podium li::before{
+      content:attr(data-rank);
+      position:absolute;
+      top:-16px;
+      left:16px;
+      padding:6px 12px;
+      border-radius:12px;
+      background:linear-gradient(120deg,rgba(56,213,255,0.5),rgba(246,165,93,0.55));
+      color:#04111c;
+      font-weight:700;
+      letter-spacing:0.08em;
+      text-transform:uppercase;
+      box-shadow:0 12px 32px rgba(0,0,0,0.3);
+    }
+    .champion-fanfare__podium-name{
+      font-size:1.1rem;
+      font-weight:600;
+      letter-spacing:0.05em;
+    }
+    .champion-fanfare__podium-tokens{
+      font-size:0.95rem;
+      color:rgba(148,187,205,0.85);
+      letter-spacing:0.16em;
+      text-transform:uppercase;
+    }
+    .champion-fanfare__summary{
+      font-size:0.95rem;
+      color:rgba(148,187,205,0.88);
+      letter-spacing:0.14em;
+      text-transform:uppercase;
+    }
+    .champion-fanfare__footer{
+      font-size:0.85rem;
+      letter-spacing:0.3em;
+      color:rgba(148,187,205,0.68);
+      text-transform:uppercase;
+    }
+    @keyframes fanfareGlow{
+      0%,100%{box-shadow:0 48px 120px rgba(0,0,0,0.65);}
+      50%{box-shadow:0 52px 160px rgba(18,78,112,0.65);}
+    }
+    @keyframes fanfarePulse{
+      0%,100%{transform:scale(0.95);opacity:0.6;}
+      50%{transform:scale(1.05);opacity:0.9;}
+    }
+    @keyframes orbitSpin{
+      from{transform:rotate(0deg);}
+      to{transform:rotate(360deg);}
+    }
     @keyframes ambientTwinkle{
       0%,100%{opacity:0.35;}
       45%{opacity:0.65;}
@@ -889,11 +1057,18 @@
       #ambientField{animation:none !important;}
       #ambientField::after{animation:none !important;}
       .spotlight-confetti span{display:none !important;}
+      .champion-fanfare{transition:none !important;}
+      .champion-fanfare__backdrop{animation:none !important;}
+      .champion-fanfare__orbit{animation:none !important;}
     }
     @media (max-width:1280px){
       .layout{width:94vw;padding:24px 28px;}
       header.hud-bar{gap:22px;}
       main.command-deck{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:"timer timer" "leaderboard history";}
+    }
+    @media (max-width:960px){
+      .champion-fanfare__core{padding:44px 28px;gap:24px;}
+      .champion-fanfare__podium{grid-template-columns:minmax(0,1fr);}
     }
     @media (max-width:1040px){
       header.hud-bar{grid-template-columns:1fr;gap:18px;}
@@ -992,6 +1167,18 @@
         </span>
       </div>
       <div class="spotlight-footer" id="spotlightFooter">Prepare for the next challenge</div>
+    </div>
+  </div>
+  <div id="championFanfare" class="champion-fanfare" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="champion-fanfare__backdrop"></div>
+    <div class="champion-fanfare__core">
+      <div class="champion-fanfare__orbit" aria-hidden="true"></div>
+      <div class="champion-fanfare__title">Time-Bank Grand Champion</div>
+      <div id="championName" class="champion-fanfare__champion">—</div>
+      <div class="champion-fanfare__tokens"><strong id="championTokens">0</strong><span>token haul</span></div>
+      <div id="championSummary" class="champion-fanfare__summary">—</div>
+      <ol id="championPodium" class="champion-fanfare__podium" aria-label="Top standings"></ol>
+      <div class="champion-fanfare__footer">Tap or press any key to continue</div>
     </div>
   </div>
   </div>

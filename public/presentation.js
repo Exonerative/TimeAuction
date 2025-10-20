@@ -30,6 +30,11 @@
   const spotlightRound = document.getElementById('spotlightRound');
   const spotlightFooter = document.getElementById('spotlightFooter');
   const confettiContainer = winnerSpotlight ? winnerSpotlight.querySelector('.spotlight-confetti') : null;
+  const championFanfare = document.getElementById('championFanfare');
+  const championName = document.getElementById('championName');
+  const championTokens = document.getElementById('championTokens');
+  const championSummary = document.getElementById('championSummary');
+  const championPodium = document.getElementById('championPodium');
 
   let latestState = { scoreboard: [], history: [], scoreboardVisible: true, lastWinnerName: '', lastWinnerTokens: null, lastWinnerMs: null, lastWinnerRound: null };
   let timerInterval = null;
@@ -38,6 +43,7 @@
   let phaseTransitionTimeout = null;
   let lastPhaseForAudio = '';
   let winnerSpotlightTimer = null;
+  let championFanfareTimer = null;
   let audioManager = null;
   let statusTone = 'default';
   let lastNoHoldRound = null;
@@ -445,6 +451,9 @@
     latestState = Object.assign({}, latestState, patch);
     if (patch.scoreboard !== undefined) latestState.scoreboard = Array.isArray(patch.scoreboard) ? patch.scoreboard : [];
     if (patch.history !== undefined) latestState.history = Array.isArray(patch.history) ? patch.history : [];
+    if ((patch.phase && patch.phase !== 'idle') || patch.started){
+      hideChampionFanfare();
+    }
     renderPhase();
     renderNextReady();
     renderScoreboard();
@@ -498,7 +507,17 @@
       latestState.scoreboardVisible = true;
       renderScoreboard();
     }
+    showChampionFanfare(info);
   });
+
+  if (championFanfare){
+    championFanfare.addEventListener('click', ()=> hideChampionFanfare());
+    document.addEventListener('keydown', (event)=>{
+      if (championFanfare.classList.contains('active')){
+        hideChampionFanfare();
+      }
+    });
+  }
 
   document.addEventListener('visibilitychange', ()=>{
     if (document.hidden){
@@ -517,6 +536,97 @@
     }
     winnerSpotlight.classList.remove('active');
     winnerSpotlight.setAttribute('aria-hidden', 'true');
+  }
+
+  function hideChampionFanfare(){
+    if (!championFanfare) return;
+    if (championFanfareTimer){
+      clearTimeout(championFanfareTimer);
+      championFanfareTimer = null;
+    }
+    championFanfare.classList.remove('active');
+    championFanfare.setAttribute('aria-hidden', 'true');
+  }
+
+  function formatPodiumEntry(entry){
+    if (!entry) return { name: '—', tokens: '—' };
+    const parsedTokens = typeof entry.tokens === 'number' ? entry.tokens : Number(entry.tokens);
+    return {
+      name: entry.name || '—',
+      tokens: Number.isFinite(parsedTokens) ? parsedTokens : '—',
+    };
+  }
+
+  function showChampionFanfare(info={}){
+    if (!championFanfare) return;
+    const championInfo = info.champion || {};
+    const finalRows = Array.isArray(info.final) ? info.final.slice() : [];
+    const podium = finalRows
+      .filter(row => row && row.rank != null)
+      .sort((a, b)=> (a.rank || 999) - (b.rank || 999))
+      .slice(0, 3);
+    hideWinnerSpotlight();
+    if (championName){
+      championName.textContent = championInfo.name || 'Grand Champion';
+    }
+    if (championTokens){
+      const totalSource = championInfo.tokens != null ? championInfo.tokens : (podium[0] && podium[0].tokens != null ? podium[0].tokens : 0);
+      const parsedTotal = typeof totalSource === 'number' ? totalSource : Number(totalSource);
+      championTokens.textContent = Number.isFinite(parsedTotal) ? parsedTotal : '—';
+    }
+    if (championSummary){
+      const rounds = Number.isFinite(info.roundsPlayed) ? info.roundsPlayed : null;
+      const summaryParts = [];
+      if (typeof championInfo.handle === 'string' && championInfo.handle){
+        summaryParts.push(`Handle: ${championInfo.handle}`);
+      }
+      if (rounds){
+        summaryParts.push(`${rounds} rounds fought`);
+      }
+      if (championInfo.bestHoldMs != null){
+        const bestHold = formatMs(championInfo.bestHoldMs);
+        if (bestHold && bestHold !== '—'){
+          summaryParts.push(`Best hold ${bestHold}`);
+        }
+      }
+      championSummary.textContent = summaryParts.length ? summaryParts.join(' · ') : 'Victory secured with tactical precision';
+    }
+    if (championPodium){
+      championPodium.innerHTML = '';
+      if (!podium.length && finalRows.length){
+        podium.push(finalRows[0]);
+      }
+      if (!podium.length){
+        const li = document.createElement('li');
+        li.dataset.rank = '—';
+        li.className = 'champion-fanfare__podium-empty';
+        li.textContent = 'Awaiting final standings';
+        championPodium.appendChild(li);
+      } else {
+        podium.forEach((row, idx)=>{
+          const { name, tokens } = formatPodiumEntry(row);
+          const li = document.createElement('li');
+          const rankLabel = row.rank != null ? `#${row.rank}` : `#${idx + 1}`;
+          li.dataset.rank = rankLabel;
+          const nameSpan = document.createElement('div');
+          nameSpan.className = 'champion-fanfare__podium-name';
+          nameSpan.textContent = name;
+          const tokensSpan = document.createElement('div');
+          tokensSpan.className = 'champion-fanfare__podium-tokens';
+          tokensSpan.textContent = `${tokens} 🪙`;
+          li.appendChild(nameSpan);
+          li.appendChild(tokensSpan);
+          championPodium.appendChild(li);
+        });
+      }
+    }
+    championFanfare.classList.add('active');
+    championFanfare.setAttribute('aria-hidden', 'false');
+    if (championFanfareTimer){
+      clearTimeout(championFanfareTimer);
+    }
+    championFanfareTimer = setTimeout(()=> hideChampionFanfare(), 16000);
+    if (audioManager) audioManager.play('champion');
   }
 
   function populateConfetti(){
@@ -733,6 +843,11 @@
             scheduleTone([392,523,659], 1.4, { type: 'sawtooth', gain: 0.16, detune: 6 });
             scheduleTone([784], 0.9, { type: 'triangle', gain: 0.12 });
             break;
+          case 'champion':
+            scheduleTone([262,392,523], 1.8, { type: 'square', gain: 0.18, detune: 4 });
+            scheduleTone([784,1046], 1.6, { type: 'sawtooth', gain: 0.14, detune: 7 });
+            scheduleTone([1318], 0.9, { type: 'triangle', gain: 0.12 });
+            break;
           case 'bonus':
             scheduleTone([440,660], 0.9, { type: 'triangle', gain: 0.12 });
             break;
@@ -775,6 +890,8 @@
         handleRoundResult,
         showWinnerSpotlight,
         hideWinnerSpotlight,
+        showChampionFanfare,
+        hideChampionFanfare,
         showStatus,
         setStatusTone,
         get audioManager(){
