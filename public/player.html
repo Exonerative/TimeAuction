@@ -73,8 +73,8 @@
   .round-result{ margin-top:10px; font-size:14px; color:var(--muted); font-weight:500; transition:color .2s ease, text-shadow .35s ease; }
   .round-result.round-result--alert{ color:#fecaca; font-weight:700; text-shadow:0 0 12px rgba(248,113,113,.45); }
 
-  .gameMeta{display:grid;gap:10px;margin:8px 0 2px}
-  @media (min-width:520px){ .gameMeta{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));} }
+  .gameMeta{display:grid;gap:10px;margin:8px 0 2px;grid-template-columns:repeat(2,minmax(0,1fr))}
+  @media (max-width:340px){ .gameMeta{grid-template-columns:1fr;} }
   .metaItem{background:#11141c;border:1px solid #1f2632;border-radius:14px;padding:12px 14px}
   .metaLabel{margin:0 0 6px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8}
   .metaValue{font-weight:700;font-size:15px}
