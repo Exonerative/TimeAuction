@@ -23,10 +23,12 @@
   const historyList = document.getElementById('historyList');
   const historyEmpty = document.getElementById('historyEmpty');
   const winnerSpotlight = document.getElementById('winnerSpotlight');
+  const spotlightTitle = document.getElementById('spotlightTitle');
   const spotlightWinnerName = document.getElementById('spotlightWinnerName');
   const spotlightTokens = document.getElementById('spotlightTokens');
   const spotlightHold = document.getElementById('spotlightHold');
   const spotlightRound = document.getElementById('spotlightRound');
+  const spotlightFooter = document.getElementById('spotlightFooter');
   const confettiContainer = winnerSpotlight ? winnerSpotlight.querySelector('.spotlight-confetti') : null;
 
   const MAX_HISTORY = 4;
@@ -379,59 +381,9 @@
     renderScoreboard();
   });
 
-  socket.on('round_no_hold', (info={})=>{
-    const roundNumber = (typeof info.round === 'number' && Number.isFinite(info.round)) ? info.round : null;
-    const shouldChime = lastNoHoldRound !== roundNumber;
-    lastNoHoldRound = roundNumber;
-    setStatusTone('danger');
-    const label = roundNumber != null ? roundNumber : '?';
-    showStatus(`Round ${label}: Nobody held!`, 7000);
-    hideWinnerSpotlight();
-    if (shouldChime && audioManager) audioManager.play('alert');
-  });
+  socket.on('round_no_hold', (info={})=>{ handleRoundNoHold(info); });
 
-  socket.on('round_result', (info={})=>{
-    const reason = typeof info.reason === 'string' ? info.reason : '';
-    const roundNumber = (typeof info.round === 'number' && Number.isFinite(info.round)) ? info.round : null;
-    const entry = {
-      round: info.round,
-      winnerName: info.winner,
-      winnerTokens: info.winnerTokens,
-      winnerMs: info.winnerMs,
-      ts: serverNow(),
-      reason,
-    };
-    const history = Array.isArray(latestState.history) ? latestState.history.slice() : [];
-    history.unshift(entry);
-    latestState.history = history.slice(0, MAX_HISTORY);
-    latestState.lastWinnerName = info.winner || '';
-    latestState.lastWinnerTokens = info.winnerTokens;
-    latestState.lastWinnerMs = info.winnerMs;
-    latestState.lastWinnerRound = info.round;
-    renderHistory();
-    renderScoreboard();
-    const isNoHold = reason === 'no-hold';
-    if (isNoHold){
-      const label = roundNumber != null ? roundNumber : '?';
-      const shouldChime = lastNoHoldRound !== roundNumber;
-      lastNoHoldRound = roundNumber;
-      setStatusTone('danger');
-      showStatus(`Round ${label}: Nobody held!`, 7000);
-      hideWinnerSpotlight();
-      if (shouldChime && audioManager) audioManager.play('alert');
-    } else if (info.winner){
-      setStatusTone('default');
-      showStatus(`Round ${info.round} winner: ${info.winner}`, 6000);
-      showWinnerSpotlight(info);
-      if (audioManager) audioManager.play('winner');
-      lastNoHoldRound = null;
-    } else {
-      setStatusTone('default');
-      showStatus(`Round ${info.round} completed`, 4000);
-      hideWinnerSpotlight();
-      lastNoHoldRound = null;
-    }
-  });
+  socket.on('round_result', (info={})=>{ handleRoundResult(info); });
 
   socket.on('bonus_round_armed', (info={})=>{
     const mult = info.value != null ? `×${info.value}` : '';
@@ -496,35 +448,124 @@
     }
   }
 
+  function handleRoundNoHold(info={}){
+    const roundNumber = (typeof info.round === 'number' && Number.isFinite(info.round)) ? info.round : null;
+    const shouldChime = lastNoHoldRound !== roundNumber;
+    lastNoHoldRound = roundNumber;
+    setStatusTone('danger');
+    const label = roundNumber != null ? roundNumber : '?';
+    showStatus(`Round ${label}: Nobody held!`, 7000);
+    showWinnerSpotlight({
+      reason: 'no-hold',
+      round: roundNumber,
+      noHoldLabel: info.noHoldLabel,
+    });
+    if (shouldChime && audioManager) audioManager.play('alert');
+    return shouldChime;
+  }
+
+  function handleRoundResult(info={}){
+    const reason = typeof info.reason === 'string' ? info.reason : '';
+    const entry = {
+      round: info.round,
+      winnerName: info.winner,
+      winnerTokens: info.winnerTokens,
+      winnerMs: info.winnerMs,
+      ts: serverNow(),
+      reason,
+    };
+    const history = Array.isArray(latestState.history) ? latestState.history.slice() : [];
+    history.unshift(entry);
+    latestState.history = history.slice(0, MAX_HISTORY);
+    latestState.lastWinnerName = info.winner || '';
+    latestState.lastWinnerTokens = info.winnerTokens;
+    latestState.lastWinnerMs = info.winnerMs;
+    latestState.lastWinnerRound = info.round;
+    renderHistory();
+    renderScoreboard();
+    if (reason === 'no-hold'){
+      handleRoundNoHold(info);
+      return;
+    }
+    const roundLabel = (typeof info.round === 'number' && Number.isFinite(info.round)) ? info.round : '?';
+    if (info.winner){
+      setStatusTone('default');
+      showStatus(`Round ${roundLabel} winner: ${info.winner}`, 6000);
+      showWinnerSpotlight(info);
+      if (audioManager) audioManager.play('winner');
+      lastNoHoldRound = null;
+    } else {
+      setStatusTone('default');
+      showStatus(`Round ${roundLabel} completed`, 4000);
+      hideWinnerSpotlight();
+      lastNoHoldRound = null;
+    }
+  }
+
   function showWinnerSpotlight(info){
     if (!winnerSpotlight) return;
+    const payload = info || {};
+    const variant = (payload.reason === 'no-hold' || payload.variant === 'no-hold') ? 'no-hold' : 'winner';
     if (winnerSpotlightTimer){
       clearTimeout(winnerSpotlightTimer);
       winnerSpotlightTimer = null;
     }
-    if (spotlightWinnerName) spotlightWinnerName.textContent = info.winner || '—';
+    winnerSpotlight.classList.toggle('no-hold', variant === 'no-hold');
+    if (spotlightTitle){
+      spotlightTitle.textContent = variant === 'no-hold' ? 'No winner this round' : 'Champion of the round';
+    }
+    if (spotlightWinnerName){
+      if (variant === 'no-hold'){
+        spotlightWinnerName.textContent = payload.noHoldLabel || 'Nobody held';
+      } else {
+        spotlightWinnerName.textContent = payload.winner || '—';
+      }
+    }
     if (spotlightTokens){
-      const tokens = info.winnerTokens != null ? info.winnerTokens : 0;
       spotlightTokens.innerHTML = '';
-      const strong = document.createElement('strong');
-      strong.textContent = tokens;
-      spotlightTokens.appendChild(strong);
-      spotlightTokens.appendChild(document.createTextNode(' 🪙'));
+      if (variant === 'no-hold'){
+        const strong = document.createElement('strong');
+        strong.textContent = 'No tokens';
+        spotlightTokens.appendChild(strong);
+        spotlightTokens.appendChild(document.createTextNode(' awarded'));
+      } else {
+        const tokens = payload.winnerTokens != null ? payload.winnerTokens : 0;
+        const strong = document.createElement('strong');
+        strong.textContent = tokens;
+        spotlightTokens.appendChild(strong);
+        spotlightTokens.appendChild(document.createTextNode(' 🪙'));
+      }
     }
     if (spotlightHold){
-      const holdText = formatMs(info.winnerMs);
-      const safeHold = holdText !== '—' ? holdText : '0s';
       spotlightHold.innerHTML = '';
-      const strong = document.createElement('strong');
-      strong.textContent = safeHold;
-      spotlightHold.appendChild(strong);
-      spotlightHold.appendChild(document.createTextNode(' hold'));
+      if (variant === 'no-hold'){
+        const strong = document.createElement('strong');
+        strong.textContent = 'Hold missed';
+        spotlightHold.appendChild(strong);
+        spotlightHold.appendChild(document.createTextNode(' — round reset'));
+      } else {
+        const holdText = formatMs(payload.winnerMs);
+        const safeHold = holdText !== '—' ? holdText : '0s';
+        const strong = document.createElement('strong');
+        strong.textContent = safeHold;
+        spotlightHold.appendChild(strong);
+        spotlightHold.appendChild(document.createTextNode(' hold'));
+      }
     }
     if (spotlightRound){
-      const round = info.round != null ? info.round : '?';
+      const round = payload.round != null ? payload.round : '?';
       spotlightRound.textContent = `Round ${round}`;
     }
-    populateConfetti();
+    if (spotlightFooter){
+      spotlightFooter.textContent = variant === 'no-hold'
+        ? 'Regroup and get ready for the next countdown'
+        : 'Prepare for the next challenge';
+    }
+    if (variant === 'winner'){
+      populateConfetti();
+    } else if (confettiContainer){
+      confettiContainer.innerHTML = '';
+    }
     winnerSpotlight.classList.add('active');
     winnerSpotlight.setAttribute('aria-hidden', 'false');
     winnerSpotlightTimer = setTimeout(()=> hideWinnerSpotlight(), 6200);
@@ -627,6 +668,25 @@
         return muted;
       },
     };
+  }
+
+  if (typeof window !== 'undefined'){
+    Object.defineProperty(window, '__TA_PRESENTATION_DEBUG', {
+      configurable: true,
+      enumerable: false,
+      writable: true,
+      value: {
+        handleRoundNoHold,
+        handleRoundResult,
+        showWinnerSpotlight,
+        hideWinnerSpotlight,
+        showStatus,
+        setStatusTone,
+        get audioManager(){
+          return audioManager;
+        },
+      },
+    });
   }
 
   audioManager = createAudioManager(audioToggle);
