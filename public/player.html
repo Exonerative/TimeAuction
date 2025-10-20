@@ -6,7 +6,34 @@
   :root{ --bg:#0e0f12; --fg:#f2f3f7; --muted:#9aa0a6; --accent:#10b981; --danger:#ef4444; --disabled:#4b5563; }
   html,body{height:100%}
   body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;display:flex;align-items:center;justify-content:center}
-  .wrap{max-width:560px;width:100%;padding:20px}
+  .wrap{max-width:560px;width:100%;padding:20px;display:flex;flex-direction:column;align-items:stretch;gap:24px}
+  .joinHeader{position:relative;padding:26px 22px;border-radius:24px;background:linear-gradient(145deg,rgba(9,16,28,.88) 0%,rgba(14,25,44,.72) 65%,rgba(12,18,32,.68) 100%);border:1px solid rgba(54,88,128,.45);box-shadow:0 24px 60px rgba(4,8,16,.55);overflow:hidden;text-align:center;backdrop-filter:blur(18px)}
+  .joinHeader::before{content:"";position:absolute;inset:-40% -30%;background:radial-gradient(circle at 50% 20%,rgba(82,246,255,.35) 0%,rgba(30,155,205,.08) 42%,transparent 70%);opacity:.8;pointer-events:none;transform:rotate(12deg)}
+  .joinHeader::after{content:"";position:absolute;inset:1px;border-radius:22px;border:1px solid rgba(151,240,255,.14);opacity:.75;pointer-events:none}
+  .joinHeaderInner{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:12px}
+  .headerBadge{text-transform:uppercase;letter-spacing:.4em;font-size:11px;font-weight:700;color:#5de4ff;background:rgba(12,41,57,.65);border:1px solid rgba(86,189,214,.5);border-radius:999px;padding:6px 18px;box-shadow:0 0 18px rgba(45,179,215,.35)}
+  .gameTitle{margin:0;font-size:clamp(32px,8vw,46px);font-weight:900;letter-spacing:.32em;text-transform:uppercase;background:linear-gradient(120deg,#61f2ff 0%,#33c7ff 35%,#0e234a 90%);-webkit-background-clip:text;color:transparent;text-shadow:0 4px 26px rgba(20,172,215,.45);line-height:1.15}
+  .gameSubtitle{font-size:clamp(13px,3.6vw,16px);letter-spacing:.24em;text-transform:uppercase;color:#9bd7ff;text-shadow:0 0 18px rgba(95,204,255,.25)}
+  .joinHeaderDivider{width:84px;height:2px;background:linear-gradient(90deg,transparent 0%,rgba(99,219,255,.85) 50%,transparent 100%);opacity:.75}
+  .joinHeaderMeta{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#6ba5d6}
+  .joinHeaderMeta span{padding:6px 12px;border-radius:999px;background:rgba(19,36,54,.6);border:1px solid rgba(69,136,177,.4);box-shadow:0 0 24px rgba(48,149,198,.25)}
+  .joinRules{background:linear-gradient(145deg,rgba(9,15,27,.88) 0%,rgba(10,20,36,.74) 60%,rgba(9,16,28,.7) 100%);border:1px solid rgba(49,80,120,.5);border-radius:22px;padding:22px 24px;box-shadow:0 18px 54px rgba(0,0,0,.55);display:grid;gap:18px;backdrop-filter:blur(16px)}
+  .joinRulesHeader{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .joinRulesTitle{margin:0;font-size:18px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#9ae9ff;text-shadow:0 0 24px rgba(94,223,255,.35)}
+  .joinRulesAccent{flex:1;height:1px;min-width:120px;background:linear-gradient(90deg,rgba(97,242,255,.05) 0%,rgba(97,242,255,.5) 45%,rgba(14,35,74,.8) 100%);box-shadow:0 0 18px rgba(40,174,219,.25)}
+  .rulesList{margin:0;padding-left:18px;display:grid;gap:10px;color:#c3d9f5;font-size:14px;line-height:1.55}
+  .rulesList li{background:rgba(15,26,44,.58);border:1px solid rgba(60,112,162,.4);border-radius:14px;padding:12px 16px;list-style:none;position:relative}
+  .rulesList li::before{content:"";position:absolute;left:10px;top:50%;width:6px;height:6px;border-radius:999px;background:#5cf0ff;box-shadow:0 0 14px rgba(95,240,255,.7);transform:translate(-50%,-50%)}
+  .rulesList strong{color:#aff4ff;font-weight:700}
+  @media (max-width:540px){
+    .wrap{padding:16px;gap:20px}
+    .joinHeader{padding:22px 18px;border-radius:20px}
+    .joinHeader::after{border-radius:18px}
+    .gameTitle{letter-spacing:.26em}
+    .joinHeaderDivider{width:72px}
+    .joinRules{padding:20px 18px}
+    .joinRulesTitle{font-size:16px;letter-spacing:.18em}
+  }
   .card{background:#12151b;border:1px solid #1f2632;border-radius:20px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
   .pad{padding:18px}
   h1{font-size:18px;margin:0 0 8px}
@@ -132,6 +159,20 @@
 <body>
 
 <div class="wrap">
+    <div class="joinHeader">
+      <div class="joinHeaderInner">
+        <span class="headerBadge">Player Deployment</span>
+        <div class="gameTitle">Time Auction</div>
+        <div class="gameSubtitle">Press · Hold · Outlast the field</div>
+        <div class="joinHeaderDivider"></div>
+        <div class="joinHeaderMeta">
+          <span>Real-time bidding</span>
+          <span>Shared time banks</span>
+          <span>Earn victory tokens</span>
+        </div>
+      </div>
+    </div>
+
     <div class="card pad" id="joinCard">
       <h1>Join or Resume</h1>
       <div class="muted">Enter a name to join for the first time, or resume with your saved PIN.</div>
@@ -150,6 +191,18 @@
       </div>
       <div id="statusMsg" class="muted" style="margin-top:12px;display:none"></div>
     </div>
+
+    <section class="joinRules" aria-labelledby="joinRulesTitle">
+      <div class="joinRulesHeader">
+        <h2 class="joinRulesTitle" id="joinRulesTitle">How to Play</h2>
+        <div class="joinRulesAccent"></div>
+      </div>
+      <ul class="rulesList">
+        <li><strong>Press & Hold:</strong> Stay on the bid button to spend from your personal time bank and stay in the round.</li>
+        <li><strong>Release Strategically:</strong> Let go when the pressure is too high—releasing early saves time for later rounds.</li>
+        <li><strong>Win Tokens:</strong> The last player holding each round earns a victory token; rack them up to claim the final crown.</li>
+      </ul>
+    </section>
 
     <div class="card pad" id="gameCard" style="display:none">
       <div class="row" style="justify-content:space-between">
