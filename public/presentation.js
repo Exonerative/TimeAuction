@@ -53,9 +53,8 @@
     return `${pad(minutes)}:${pad(secs)}`;
   }
   function formatMs(ms){
-    if (!Number.isFinite(ms)) return '—';
-    const safeMs = Math.max(0, ms);
-    const roundedSeconds = Math.round((safeMs / 1000) * 10) / 10;
+    if (!Number.isFinite(ms) || ms <= 0) return '—';
+    const roundedSeconds = Math.round((ms / 1000) * 10) / 10;
     const minutes = Math.floor(roundedSeconds / 60);
     let seconds = Number((roundedSeconds - minutes * 60).toFixed(1));
     let mins = minutes;
