@@ -335,7 +335,6 @@
       meta.className = 'meta';
       const tokens = entry.winnerTokens != null ? `${entry.winnerTokens} 🪙` : '—';
       const hold = formatMs(entry.winnerMs);
-      const when = entry.ts ? new Date(entry.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
       const metaParts = [];
       if (isNoHold){
         metaParts.push('No holds recorded');
@@ -343,7 +342,6 @@
         if (tokens !== '—') metaParts.push(tokens);
         if (hold !== '—') metaParts.push(`hold ${hold}`);
       }
-      if (when) metaParts.push(when);
       meta.textContent = metaParts.join(' · ');
       details.appendChild(round);
       details.appendChild(winner);
