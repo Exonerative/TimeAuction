@@ -5,8 +5,9 @@
 <style>
   :root{ --bg:#0e0f12; --fg:#f2f3f7; --muted:#9aa0a6; --accent:#10b981; --danger:#ef4444; --disabled:#4b5563; }
   html,body{height:100%}
-  body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;display:flex;align-items:center;justify-content:center}
-  .wrap{max-width:560px;width:100%;padding:20px}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;align-items:center;min-height:100%;min-height:100dvh}
+  .wrap{max-width:560px;width:100%;padding:20px;margin:0 auto 40px;display:flex;justify-content:center;box-sizing:border-box}
+  .wrap>*{flex:1 1 100%;}
   .card{background:#12151b;border:1px solid #1f2632;border-radius:20px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
   .pad{padding:18px}
   h1{font-size:18px;margin:0 0 8px}
@@ -73,14 +74,41 @@
   .public-scoreboard,#publicScoreboard,.scoreboard,[data-role="public-scoreboard"]{ max-height:calc(100dvh - var(--hud-h) - 16px - env(safe-area-inset-top)); overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch }
 
   /* P213 splash */
-  :root{ --splash-bg: linear-gradient(180deg, #0b1223 0%, #0a0f1a 100%); }
-  .splash{ position:relative; min-height:60dvh; display:flex; align-items:center; justify-content:center; text-align:center; padding:calc(16px + env(safe-area-inset-top)) 16px 12px; }
-  .splash-bg{ position:absolute; inset:0; background:var(--splash-bg); }
-  .splash-inner{ position:relative; z-index:1; max-width:720px; color:#e6f0ff }
-  .splash-title{ margin:.6rem 0 .6rem; font-size:clamp(28px, 6vw, 48px); font-weight:800; letter-spacing:.2px }
-  .splash-cta{ display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap }
-  .btn.primary{ background:#124c3a; color:#001; border:0; padding:.7rem 1rem; border-radius:12px; font-weight:800; cursor:pointer }
+  :root{ --splash-bg: radial-gradient(circle at 20% 20%, rgba(59,130,246,.25), transparent 55%), linear-gradient(180deg, #0b1223 0%, #080d16 100%); }
+  .splash{ position:relative; width:100%; display:flex; align-items:center; justify-content:center; padding:calc(28px + env(safe-area-inset-top)) clamp(16px, 5vw, 48px) clamp(24px + env(safe-area-inset-bottom), 32px, 56px); overflow:hidden; }
+  .splash::before{ content:""; position:absolute; inset:-40% -20% auto -30%; height:140%; background:linear-gradient(115deg, rgba(14,197,162,.0) 0%, rgba(14,197,162,.35) 60%, rgba(14,197,162,.0) 100%); transform:rotate(-6deg); mix-blend-mode:screen; animation:beamSweep 12s ease-in-out infinite; opacity:.8; pointer-events:none; }
+  .splash::after{ content:""; position:absolute; inset:-60% -40% -10%; background:radial-gradient(circle at 65% 30%, rgba(59,130,246,.3), rgba(12,18,32,.02) 52%, transparent 70%), radial-gradient(circle at 15% 70%, rgba(244,114,182,.45), transparent 55%); filter:blur(0.6px); animation:nebulaDrift 22s linear infinite; pointer-events:none; opacity:.75; }
+  .splash-bg{ position:absolute; inset:0; background:var(--splash-bg); z-index:0; }
+  .splash-particles{ position:absolute; inset:0; pointer-events:none; z-index:0; background-image:radial-gradient(rgba(148,163,184,.45) 1px, transparent 0), radial-gradient(rgba(148,163,184,.35) 1px, transparent 0); background-size:120px 120px, 200px 200px; background-position:0 0, 40px 60px; animation:particleDrift 18s linear infinite; opacity:.55; }
+  .splash-inner{ position:relative; z-index:1; width:min(100%, clamp(320px, 92vw, 980px)); display:flex; align-items:center; gap:clamp(18px, 6vw, 56px); color:#e6f0ff; }
+  .splash-left{ flex:1 1 50%; display:flex; flex-direction:column; gap:clamp(18px, 3vw, 32px); text-align:left; max-width:520px; }
+  .splash-eyebrow{ display:inline-flex; align-items:center; gap:6px; font-size:12px; letter-spacing:.14em; text-transform:uppercase; background:rgba(15,23,42,.6); padding:6px 12px; border-radius:999px; border:1px solid rgba(59,130,246,.35); box-shadow:0 10px 30px rgba(13,23,42,.45); }
+  .splash-art{ position:relative; width:100%; border-radius:24px; background:linear-gradient(135deg, rgba(15,23,42,.65) 0%, rgba(15,118,110,.4) 100%); aspect-ratio:5/3; min-height:220px; overflow:hidden; box-shadow:0 22px 60px rgba(4,6,12,.65); }
+  .splash-art::before{ content:""; position:absolute; inset:12% 12% 20%; border-radius:20px; border:1px solid rgba(148,163,184,.25); background:linear-gradient(160deg, rgba(14,197,162,.15), rgba(30,64,175,.25)); box-shadow:0 14px 36px rgba(13,148,136,.25) inset; filter:drop-shadow(0 0 32px rgba(20,184,166,.35)); }
+  .splash-art::after{ content:""; position:absolute; inset:auto 18% 10%; height:52%; border-radius:50%; background:radial-gradient(circle at 50% 30%, rgba(226,232,240,.8) 0%, rgba(226,232,240,.02) 55%); animation:holoPulse 4.4s ease-in-out infinite; opacity:.85; mix-blend-mode:screen; }
+  .splash-telemetry{ margin:0; padding:0; list-style:none; display:grid; gap:12px; font-size:14px; color:rgba(186,211,255,.85); }
+  .splash-telemetry li{ display:flex; flex-direction:column; gap:4px; background:rgba(10,18,32,.55); border:1px solid rgba(56,78,126,.35); border-radius:16px; padding:12px 14px; box-shadow:0 12px 32px rgba(3,10,20,.45); backdrop-filter:blur(6px); }
+  .splash-telemetry span{ font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:rgba(148,163,184,.75); }
+  .splash-telemetry strong{ font-size:clamp(16px, 4vw, 22px); color:#f8fafc; font-weight:700; letter-spacing:.01em; }
+  .splash-right{ flex:1 1 40%; display:flex; justify-content:center; }
+  .splash-panel{ width:100%; max-width:min(420px, 92vw); border-radius:20px; background:rgba(10,14,21,.9); border:1px solid rgba(37,48,68,.9); box-shadow:0 24px 60px rgba(2,8,18,.65); backdrop-filter:blur(12px); }
+  .splash-title{ margin:.6rem 0 .6rem; font-size:clamp(30px, 5.4vw, 54px); font-weight:800; letter-spacing:.2px; line-height:1.1; }
+  .splash-sub{ margin:0; color:rgba(201,214,242,.85); font-size:clamp(14px, 3.4vw, 17px); line-height:1.5; max-width:36ch; }
+  .splash-cta{ display:flex; gap:10px; justify-content:flex-start; align-items:center; flex-wrap:wrap }
+  .splash-panel .btn.primary{ background:#124c3a; color:#001; border:0; padding:.7rem 1rem; border-radius:12px; font-weight:800; cursor:pointer }
   .link{ color:#93c5fd; text-decoration:underline }
+  @media (max-width:900px){
+    .splash-inner{ gap:clamp(18px, 4vw, 42px); }
+    .splash-art{ border-radius:20px; }
+  }
+  @media (max-width:600px){
+    .splash{ padding:calc(24px + env(safe-area-inset-top)) clamp(18px, 6vw, 28px) clamp(28px + env(safe-area-inset-bottom), 36px, 48px); }
+    .splash-inner{ flex-direction:column; align-items:stretch; text-align:center; gap:clamp(18px, 5vw, 28px); }
+    .splash-left{ align-items:center; text-align:center; }
+    .splash-telemetry{ width:100%; text-align:left; }
+    .splash-right{ justify-content:center; }
+    .splash-panel{ margin:0 auto; }
+  }
 
   /* Round recap panel */
   #roundRecapPanel{position:fixed;inset:0;display:flex;align-items:flex-end;justify-content:center;padding:16px 18px 24px;z-index:220;pointer-events:none;transition:visibility .28s ease;visibility:hidden}
@@ -122,6 +150,12 @@
   #toggleReadyBtn.ready{background:#1f2632;color:#e5e7eb;border-color:#1f2632}
 
 
+  /* Splash animation primitives */
+  @keyframes beamSweep { 0%{transform:translateX(-18%) rotate(-6deg); opacity:.55;} 50%{transform:translateX(12%) rotate(-6deg); opacity:.9;} 100%{transform:translateX(-18%) rotate(-6deg); opacity:.55;} }
+  @keyframes nebulaDrift { 0%{transform:translate3d(0,0,0) scale(1);} 50%{transform:translate3d(2%, -1%, 0) scale(1.06);} 100%{transform:translate3d(0,0,0) scale(1);} }
+  @keyframes particleDrift { 0%{background-position:0 0, 40px 60px;} 50%{background-position:30px 20px, 80px 120px;} 100%{background-position:0 0, 40px 60px;} }
+  @keyframes holoPulse { 0%{transform:translateY(2%) scale(.94); opacity:.6;} 50%{transform:translateY(-4%) scale(1.04); opacity:1;} 100%{transform:translateY(2%) scale(.94); opacity:.6;} }
+
   /* Heartbeat pulse */
   @keyframes hbBeat { 0%{transform:scale(1)} 40%{transform:scale(1.03)} 100%{transform:scale(1)} }
   .hold.hb-beat { animation: hbBeat 180ms ease-out; box-shadow: 0 0 0 0 rgba(16,185,129,.35); }
@@ -131,26 +165,47 @@
 </head>
 <body>
 
-<div class="wrap">
-    <div class="card pad" id="joinCard">
-      <h1>Join or Resume</h1>
-      <div class="muted">Enter a name to join for the first time, or resume with your saved PIN.</div>
-      <div id="savedSession" class="muted" style="display:none;margin-top:8px"></div>
-      <div class="row" style="margin-top:10px">
-        <input id="name" type="text" maxlength="24" placeholder="Your name"/>
-        <button id="join" class="btn primary">Join</button>
+  <section class="splash" id="joinCard">
+    <div class="splash-bg" aria-hidden="true"></div>
+    <div class="splash-particles" aria-hidden="true"></div>
+    <div class="splash-inner">
+      <div class="splash-left">
+        <span class="splash-eyebrow">Live Arena • Players Unite</span>
+        <h1 class="splash-title">Hold for the win. Stay for the story.</h1>
+        <p class="splash-sub">Lock in, time your release, and keep the beam powered longer than anyone else. Your crew is watching.</p>
+        <div class="splash-art" role="presentation"></div>
+        <ul class="splash-telemetry" aria-label="Arena telemetry">
+          <li><span>Last champion pulse</span><strong>82.3s collective hold</strong></li>
+          <li><span>Energy pool online</span><strong>Next surge in 00:45</strong></li>
+          <li><span>Connected contenders</span><strong id="splashActivePlayers">Live when you join</strong></li>
+        </ul>
       </div>
-      <div id="nameHelper" class="muted" style="margin-top:6px">We’ll generate your PIN right after launch.</div>
-      <button id="showResume" class="text-link" type="button" style="margin-top:8px;display:none">Have a PIN?</button>
-      <div id="resumeGroup" style="display:none;margin-top:10px">
-        <div class="row">
-          <input id="pin" type="text" maxlength="6" placeholder="Your PIN (4–5 digits)"/>
-          <button id="reconnect" class="btn">Resume</button>
+      <div class="splash-right">
+        <div class="splash-panel card">
+          <div class="pad">
+            <h1>Join or Resume</h1>
+            <div class="muted">Enter a name to join for the first time, or resume with your saved PIN.</div>
+            <div id="savedSession" class="muted" style="display:none;margin-top:8px"></div>
+            <div class="row" style="margin-top:10px">
+              <input id="name" type="text" maxlength="24" placeholder="Your name"/>
+              <button id="join" class="btn primary">Join</button>
+            </div>
+            <div id="nameHelper" class="muted" style="margin-top:6px">We’ll generate your PIN right after launch.</div>
+            <button id="showResume" class="text-link" type="button" style="margin-top:8px;display:none">Have a PIN?</button>
+            <div id="resumeGroup" style="display:none;margin-top:10px">
+              <div class="row" style="flex-wrap:wrap">
+                <input id="pin" type="text" maxlength="6" placeholder="Your PIN (4–5 digits)"/>
+                <button id="reconnect" class="btn">Resume</button>
+              </div>
+            </div>
+            <div id="statusMsg" class="muted" style="margin-top:12px;display:none"></div>
+          </div>
         </div>
       </div>
-      <div id="statusMsg" class="muted" style="margin-top:12px;display:none"></div>
     </div>
+  </section>
 
+  <div class="wrap">
     <div class="card pad" id="gameCard" style="display:none">
       <div class="row" style="justify-content:space-between">
         <div>
