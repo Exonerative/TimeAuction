@@ -606,8 +606,18 @@
         podium.forEach((row, idx)=>{
           const { name, tokens } = formatPodiumEntry(row);
           const li = document.createElement('li');
-          const rankLabel = row.rank != null ? `#${row.rank}` : `#${idx + 1}`;
+          let placement = row.rank != null ? Number(row.rank) : (idx + 1);
+          if (!Number.isFinite(placement)) placement = idx + 1;
+          const rankLabel = placement != null ? `#${placement}` : `#${idx + 1}`;
           li.dataset.rank = rankLabel;
+          li.className = 'champion-fanfare__podium-item';
+          if (placement === 1){
+            li.classList.add('champion-fanfare__podium-item--first');
+          } else if (placement === 2){
+            li.classList.add('champion-fanfare__podium-item--second');
+          } else if (placement === 3){
+            li.classList.add('champion-fanfare__podium-item--third');
+          }
           const nameSpan = document.createElement('div');
           nameSpan.className = 'champion-fanfare__podium-name';
           nameSpan.textContent = name;
