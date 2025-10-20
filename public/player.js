@@ -729,6 +729,7 @@
     }
     const panelWasHidden = !nextReadyPanel.classList.contains('show');
     nextReadyPanel.classList.add('show');
+    nextReadyPanel.style.display = '';
     nextReadyPanel.setAttribute('aria-hidden','false');
     const readyCount = nextReadyState.readyCount || 0;
     const requiredCount = nextReadyState.requiredCount || 0;
@@ -968,7 +969,7 @@
   });
 
   socket.on('arming_started', ()=>{
-    nextReadyCountdownCfg = null; stopNextReadyCountdown(); if (nextReadyCountdownPlayer) nextReadyCountdownPlayer.style.display='none'; if (nextReadyPanel) nextReadyPanel.style.display='none';
+    nextReadyCountdownCfg = null; stopNextReadyCountdown(); if (nextReadyCountdownPlayer) nextReadyCountdownPlayer.style.display='none'; if (nextReadyPanel){ nextReadyPanel.classList.remove('show'); nextReadyPanel.setAttribute('aria-hidden','true'); }
     hideRoundRecap(true);
     clearNoHoldVisual();
     if (roundResult) roundResult.textContent='';
