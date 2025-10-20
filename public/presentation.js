@@ -264,6 +264,8 @@
     rows.slice(0, MAX_SCOREBOARD_ROWS).forEach((row, index)=>{
       const li = document.createElement('li');
       li.className = 'scoreboard-row';
+      const main = document.createElement('div');
+      main.className = 'scoreboard-row-main';
       const rank = document.createElement('span');
       rank.className = 'rank';
       rank.textContent = row.rank != null ? `#${row.rank}` : '#';
@@ -277,9 +279,10 @@
       accessibleParts.push(`Rank ${row.rank != null ? row.rank : '?'}`);
       accessibleParts.push(row.name || 'Player');
       accessibleParts.push(`${row.tokens != null ? row.tokens : 0} tokens`);
-      li.appendChild(rank);
-      li.appendChild(name);
-      li.appendChild(tokens);
+      main.appendChild(rank);
+      main.appendChild(name);
+      main.appendChild(tokens);
+      li.appendChild(main);
       if (index === 0){
         li.classList.add('leader');
         accessibleParts.push('Current leader');
@@ -287,10 +290,11 @@
       if (lastWinner && row.name && row.name.toLowerCase() === lastWinner){
         li.classList.add('recent-winner');
         accessibleParts.push('Most recent round winner');
-        const badge = document.createElement('span');
-        badge.className = 'badge badge-winner';
-        badge.textContent = 'Winner';
-        li.appendChild(badge);
+        const banner = document.createElement('div');
+        banner.className = 'scoreboard-row-banner';
+        banner.setAttribute('aria-hidden', 'true');
+        banner.textContent = 'Winner of last round';
+        li.insertBefore(banner, main);
       }
       li.setAttribute('aria-label', accessibleParts.join(', '));
       const sr = document.createElement('span');
