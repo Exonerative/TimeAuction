@@ -5,7 +5,7 @@
 <style>
   :root{ --bg:#0e0f12; --fg:#f2f3f7; --muted:#9aa0a6; --accent:#10b981; --danger:#ef4444; --disabled:#4b5563; }
   html,body{height:100%}
-  body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;display:flex;align-items:center;justify-content:center}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;min-height:100dvh;padding:calc(24px + env(safe-area-inset-top)) 0 32px}
   .wrap{max-width:560px;width:100%;padding:20px;display:flex;flex-direction:column;align-items:stretch;gap:24px}
   .joinHeader{position:relative;padding:26px 22px;border-radius:24px;background:linear-gradient(145deg,rgba(9,16,28,.88) 0%,rgba(14,25,44,.72) 65%,rgba(12,18,32,.68) 100%);border:1px solid rgba(54,88,128,.45);box-shadow:0 24px 60px rgba(4,8,16,.55);overflow:hidden;text-align:center;backdrop-filter:blur(18px)}
   .joinHeader::before{content:"";position:absolute;inset:-40% -30%;background:radial-gradient(circle at 50% 20%,rgba(82,246,255,.35) 0%,rgba(30,155,205,.08) 42%,transparent 70%);opacity:.8;pointer-events:none;transform:rotate(12deg)}
@@ -72,6 +72,13 @@
   .holdSub{ color:#9aa0a6; font-size:12px; margin-top:6px; text-align:center; }
   .round-result{ margin-top:10px; font-size:14px; color:var(--muted); font-weight:500; transition:color .2s ease, text-shadow .35s ease; }
   .round-result.round-result--alert{ color:#fecaca; font-weight:700; text-shadow:0 0 12px rgba(248,113,113,.45); }
+
+  .gameMeta{display:grid;gap:10px;margin:8px 0 2px}
+  @media (min-width:520px){ .gameMeta{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));} }
+  .metaItem{background:#11141c;border:1px solid #1f2632;border-radius:14px;padding:12px 14px}
+  .metaLabel{margin:0 0 6px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8}
+  .metaValue{font-weight:700;font-size:15px}
+  .metaSub{color:#9aa0a6;font-size:12px;margin-top:4px}
 
   /* Countdown overlay */
   #countdownOverlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.35); }
@@ -225,6 +232,19 @@
 
       <!-- Round timer (Active phase) -->
       <div class="muted">Round timer: <span id="roundTimer" class="mono">00:00.000</span></div>
+
+      <div class="gameMeta" id="gameMeta" aria-live="polite">
+        <div class="metaItem">
+          <div class="metaLabel">Match progress</div>
+          <div id="roundStatus" class="metaValue">Waiting for host</div>
+          <div id="roundStatusDetail" class="metaSub" style="display:none"></div>
+        </div>
+        <div class="metaItem">
+          <div class="metaLabel">Starting time bank</div>
+          <div id="timeBankValue" class="metaValue">—</div>
+          <div id="timeBankDetail" class="metaSub" style="display:none">Per player at start</div>
+        </div>
+      </div>
 
       <div id="holdArea" class="hold idle" role="button" aria-pressed="false" aria-label="Press and hold">
         <div><div id="holdText" class="holdText">Press & Hold</div><div id="holdSub" class="holdSub">Release = out (this round)</div></div>
