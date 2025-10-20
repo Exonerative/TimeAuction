@@ -53,9 +53,70 @@
     return `${pad(minutes)}:${pad(secs)}`;
   }
   function formatMs(ms){
-    if (!Number.isFinite(ms) || ms <= 0) return '—';
-    const seconds = (ms / 1000).toFixed(1);
-    return `${seconds.replace(/\.0$/, '')}s`;
+    if (!Number.isFinite(ms)) return '—';
+    const safeMs = Math.max(0, ms);
+    const roundedSeconds = Math.round((safeMs / 1000) * 10) / 10;
+    const minutes = Math.floor(roundedSeconds / 60);
+    let seconds = Number((roundedSeconds - minutes * 60).toFixed(1));
+    let mins = minutes;
+    if (seconds >= 60){
+      mins += 1;
+      seconds = Number((seconds - 60).toFixed(1));
+    }
+    const secondsText = seconds.toFixed(1);
+    const secondUnit = Number.isFinite(seconds) && Math.abs(seconds - 1) < 0.0001 ? 'second' : 'seconds';
+    if (!mins){
+      return `${secondsText} ${secondUnit}`;
+    }
+    const minuteUnit = mins === 1 ? 'minute' : 'minutes';
+    return `${mins} ${minuteUnit} ${secondsText} ${secondUnit}`;
+  }
+
+  function decorateDurationSpans(target, text, classes={}){
+    if (!target) return;
+    target.innerHTML = '';
+    if (!text || text === '—'){
+      target.textContent = text || '';
+      return;
+    }
+    const numberClass = classes.numberClass || 'duration-number';
+    const unitClass = classes.unitClass || 'duration-unit';
+    const appendUnit = (segment)=>{
+      if (!segment) return;
+      const leading = segment.match(/^\s+/);
+      const trailing = segment.match(/\s+$/);
+      const core = segment.trim();
+      if (leading){
+        target.appendChild(document.createTextNode(leading[0]));
+      }
+      if (core){
+        const unitSpan = document.createElement('span');
+        unitSpan.className = unitClass;
+        unitSpan.textContent = core;
+        target.appendChild(unitSpan);
+      }
+      if (trailing){
+        target.appendChild(document.createTextNode(trailing[0]));
+      }
+    };
+    const regex = /(\d+(?:\.\d+)?)/g;
+    let lastIndex = 0;
+    let match;
+    while ((match = regex.exec(text)) !== null){
+      if (match.index > lastIndex){
+        const unitSegment = text.slice(lastIndex, match.index);
+        appendUnit(unitSegment);
+      }
+      const numberSpan = document.createElement('span');
+      numberSpan.className = numberClass;
+      numberSpan.textContent = match[1];
+      target.appendChild(numberSpan);
+      lastIndex = match.index + match[1].length;
+    }
+    if (lastIndex < text.length){
+      const trailing = text.slice(lastIndex);
+      appendUnit(trailing);
+    }
   }
   function computeDefaultStatus(){
     if (!latestState.started) return 'Waiting for host…';
@@ -346,13 +407,36 @@
         metaParts.push('No holds recorded');
       } else {
         if (tokens !== '—') metaParts.push(tokens);
-        if (hold !== '—') metaParts.push(`hold ${hold}`);
       }
       meta.textContent = metaParts.join(' · ');
       details.appendChild(round);
       details.appendChild(winner);
       details.appendChild(meta);
       li.appendChild(details);
+      const holdStat = document.createElement('div');
+      holdStat.className = 'hold-stat';
+      const holdLabel = document.createElement('span');
+      holdLabel.className = 'hold-label';
+      holdLabel.textContent = 'Hold';
+      const holdValue = document.createElement('span');
+      holdValue.className = 'hold-value';
+      if (isNoHold){
+        holdStat.classList.add('hold-stat--empty');
+        const fallback = entry.noHoldLabel || 'No hold recorded';
+        holdValue.textContent = fallback;
+        holdStat.setAttribute('aria-label', fallback);
+      } else if (hold === '—'){
+        holdStat.classList.add('hold-stat--empty');
+        const fallback = 'Hold unavailable';
+        holdValue.textContent = fallback;
+        holdStat.setAttribute('aria-label', fallback);
+      } else {
+        decorateDurationSpans(holdValue, hold);
+        holdStat.setAttribute('aria-label', `Hold duration ${hold}`);
+      }
+      holdStat.appendChild(holdLabel);
+      holdStat.appendChild(holdValue);
+      li.appendChild(holdStat);
       historyList.appendChild(li);
       li.classList.add('enter');
       setTimeout(()=> li.classList.remove('enter'), 1800);
@@ -545,13 +629,24 @@
         strong.textContent = 'Hold missed';
         spotlightHold.appendChild(strong);
         spotlightHold.appendChild(document.createTextNode(' — round reset'));
+        spotlightHold.setAttribute('aria-label', 'Hold missed — round reset');
       } else {
         const holdText = formatMs(payload.winnerMs);
-        const safeHold = holdText !== '—' ? holdText : '0s';
-        const strong = document.createElement('strong');
-        strong.textContent = safeHold;
-        spotlightHold.appendChild(strong);
-        spotlightHold.appendChild(document.createTextNode(' hold'));
+        const label = document.createElement('span');
+        label.className = 'spotlight-hold-label';
+        label.textContent = 'Hold';
+        const value = document.createElement('span');
+        value.className = 'spotlight-hold-value';
+        if (holdText === '—'){
+          value.textContent = 'Unavailable';
+          value.classList.add('spotlight-hold-value--empty');
+          spotlightHold.setAttribute('aria-label', 'Hold unavailable');
+        } else {
+          decorateDurationSpans(value, holdText);
+          spotlightHold.setAttribute('aria-label', `Hold ${holdText}`);
+        }
+        spotlightHold.appendChild(label);
+        spotlightHold.appendChild(value);
       }
     }
     if (spotlightRound){
