@@ -431,6 +431,29 @@
       min-height:0;
       overflow-y:auto;
       scrollbar-width:thin;
+      scrollbar-color:rgba(56,213,255,0.65) rgba(6,22,38,0.75);
+    }
+    .scoreboard-list::-webkit-scrollbar,
+    .history-list::-webkit-scrollbar{
+      width:10px;
+    }
+    .scoreboard-list::-webkit-scrollbar-track,
+    .history-list::-webkit-scrollbar-track{
+      background:linear-gradient(180deg,rgba(6,22,38,0.92) 0%,rgba(8,34,52,0.75) 100%);
+      border-radius:999px;
+      box-shadow:inset 0 0 0 1px rgba(0,197,255,0.18);
+    }
+    .scoreboard-list::-webkit-scrollbar-thumb,
+    .history-list::-webkit-scrollbar-thumb{
+      background:linear-gradient(180deg,rgba(56,213,255,0.85) 0%,rgba(246,165,93,0.85) 100%);
+      border-radius:999px;
+      box-shadow:0 0 12px rgba(56,213,255,0.6),0 0 18px rgba(246,165,93,0.45);
+      border:2px solid rgba(6,22,38,0.85);
+    }
+    .scoreboard-list::-webkit-scrollbar-thumb:hover,
+    .history-list::-webkit-scrollbar-thumb:hover{
+      background:linear-gradient(180deg,rgba(72,226,255,0.95) 0%,rgba(255,181,116,0.95) 100%);
+      box-shadow:0 0 14px rgba(72,226,255,0.75),0 0 20px rgba(255,181,116,0.6);
     }
     .scoreboard-row{
       display:flex;
@@ -522,6 +545,7 @@
       min-height:0;
       overflow-y:auto;
       scrollbar-width:thin;
+      scrollbar-color:rgba(246,165,93,0.75) rgba(8,26,44,0.78);
     }
     .history-item{
       padding:16px 18px;
