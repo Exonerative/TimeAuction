@@ -115,17 +115,45 @@
   }
 
   /* Circular hold button */
-  .hold.bonus{ background:#231a00; border-color:#d4af37; box-shadow:0 0 0 2px rgba(212,175,55,.25) inset; }
-  .hold{ width:min(72vw, 420px); height:min(72vw, 420px); max-width:420px; max-height:420px; min-width:220px; min-height:220px; border-radius:9999px; margin:18px auto 6px; display:flex; align-items:center; justify-content:center; user-select:none; -webkit-user-select:none; touch-action:manipulation; border:6px solid transparent; transition:transform .08s ease, background .15s ease, border-color .15s ease, opacity .15s ease; }
-  .hold.idle{ background:#1a0f12; border-color:var(--danger); }
-  .hold.pressed{ background:#0f1a14; border-color:var(--accent); }
-  .hold.disabled{ background:#101318; border-color:var(--disabled); opacity:.6; }
+  .hold{ --hold-outer-metal:linear-gradient(155deg,#27303c 0%,#0f172a 52%,#0b1220 100%); --hold-inner-metal:linear-gradient(160deg,#0b1628 0%,#111d30 55%,#050912 100%); --hold-emissive-color:rgba(56,189,248,.32); --hold-glow-color:rgba(56,189,248,.5); --hold-plate-glass:linear-gradient(145deg,rgba(255,255,255,.22) 0%,rgba(255,255,255,.05) 52%,rgba(255,255,255,0) 82%); --hold-ring-border:rgba(148,197,255,.25); --hold-outline:rgba(56,189,248,.45); --hold-text:#f8fafc; --hold-sub:#94a3b8; position:relative; width:min(72vw,420px); aspect-ratio:1; max-width:420px; min-width:220px; max-height:420px; min-height:220px; border-radius:9999px; margin:18px auto 6px; display:grid; place-items:center; user-select:none; -webkit-user-select:none; touch-action:manipulation; transition:transform .08s ease, filter .25s ease, opacity .2s ease; cursor:pointer; }
+  .hold:focus-visible{ outline:3px solid var(--hold-outline); outline-offset:6px; }
   .hold:active{ transform:scale(.985); }
-  .hold.no-hold{ background:#1f0b12; border-color:#f87171; box-shadow:0 0 0 4px rgba(248,113,113,.25); animation:noHoldPulse 1.4s ease-in-out infinite; }
-  .hold.no-hold .holdText{ color:#fee2e2; }
-  .hold.no-hold .holdSub{ color:#fecaca; }
-  .holdText{ font-size:22px; opacity:.92; text-align:center; }
-  .holdSub{ color:#9aa0a6; font-size:12px; margin-top:6px; text-align:center; }
+  .hold__outer,.hold__inner,.hold__label{ position:relative; border-radius:50%; }
+  .hold__outer{ position:absolute; inset:0; padding:10%; pointer-events:none; }
+  .hold__outer-metal,.hold__outer-glow{ position:absolute; inset:0; border-radius:inherit; pointer-events:none; }
+  .hold__outer-metal{ z-index:2; background:var(--hold-outer-metal); box-shadow:inset 0 4px 14px rgba(0,0,0,.55), inset 0 -12px 24px rgba(0,0,0,.65); }
+  .hold__outer-metal::after{ content:""; position:absolute; inset:4%; border-radius:inherit; border:1px solid var(--hold-ring-border); box-shadow:0 0 28px rgba(15,118,110,.24),0 18px 42px rgba(8,11,20,.75); opacity:.75; mix-blend-mode:screen; }
+  .hold__outer-glow{ z-index:1; inset:-4%; background:radial-gradient(circle,var(--hold-glow-color) 0%,rgba(15,23,42,0) 70%); filter:blur(18px); opacity:.65; transform:scale(1); transform-origin:50% 50%; transition:opacity .25s ease, transform .32s ease; }
+  .hold__inner{ position:relative; width:72%; aspect-ratio:1; display:grid; place-items:center; filter:drop-shadow(0 18px 36px rgba(0,0,0,.55)); pointer-events:none; z-index:3; }
+  .hold__plate{ position:absolute; inset:0; border-radius:inherit; background:var(--hold-inner-metal); box-shadow:inset 0 12px 28px rgba(0,0,0,.65), inset 0 -16px 32px rgba(12,16,26,.85); overflow:hidden; }
+  .hold__plate::after{ content:""; position:absolute; inset:12%; border-radius:inherit; border:1px solid rgba(255,255,255,.08); opacity:.75; }
+  .hold__plate-highlight{ position:absolute; inset:0; border-radius:inherit; background:var(--hold-plate-glass); mix-blend-mode:screen; opacity:.9; }
+  .hold__seam{ position:absolute; left:50%; width:2px; height:58%; background:linear-gradient(180deg,rgba(255,255,255,.42) 0%,rgba(255,255,255,0) 100%); opacity:.38; transform:translateX(-50%); }
+  .hold__seam--north{ top:10%; }
+  .hold__seam--south{ top:auto; bottom:10%; transform:translateX(-50%) rotate(180deg); }
+  .hold__emissive{ position:absolute; inset:18%; border-radius:inherit; background:radial-gradient(circle at 50% 55%,var(--hold-emissive-color) 0%,rgba(15,23,42,0) 70%); opacity:.75; transition:opacity .2s ease, filter .28s ease; }
+  .hold__label{ position:relative; z-index:4; text-align:center; padding:6px 12px; }
+  .holdText{ font-size:22px; letter-spacing:.04em; text-align:center; color:var(--hold-text); text-shadow:0 6px 20px rgba(0,0,0,.65); transition:color .2s ease,text-shadow .32s ease; }
+  .holdSub{ color:var(--hold-sub); font-size:12px; margin-top:6px; text-align:center; letter-spacing:.02em; transition:color .2s ease; }
+  .hold--ready .hold__emissive{ opacity:.82; }
+  .hold--ready .hold__outer-glow{ opacity:.72; }
+  .hold--pressed{ transform:scale(.99); }
+  .hold--pressed:active{ transform:scale(.985); }
+  .hold--pressed .hold__plate{ box-shadow:inset 0 16px 32px rgba(0,0,0,.7), inset 0 -20px 38px rgba(8,12,18,.95); }
+  .hold--pressed .hold__emissive{ opacity:1; filter:blur(3px); }
+  .hold--pressed .hold__outer-glow{ opacity:.9; transform:scale(1.06); }
+  .hold--disabled{ cursor:not-allowed; opacity:.6; filter:saturate(.55); }
+  .hold--disabled .hold__emissive{ opacity:.25; }
+  .hold--disabled .hold__outer-glow{ opacity:.25; }
+  .hold--idlePhase{ --hold-outer-metal:linear-gradient(155deg,#27303c 0%,#0f172a 52%,#0b1220 100%); --hold-inner-metal:linear-gradient(160deg,#0b1628 0%,#111d30 55%,#050912 100%); --hold-emissive-color:rgba(56,189,248,.32); --hold-glow-color:rgba(56,189,248,.5); --hold-text:#f8fafc; --hold-sub:#94a3b8; }
+  .hold--arming{ --hold-outer-metal:linear-gradient(150deg,#4c3012 0%,#2d1c08 52%,#140c05 100%); --hold-inner-metal:linear-gradient(160deg,#36220d 0%,#2b1804 52%,#170c04 100%); --hold-emissive-color:rgba(251,191,36,.42); --hold-glow-color:rgba(251,191,36,.55); --hold-text:#fff7d6; --hold-sub:#fde68a; }
+  .hold--countdown{ --hold-outer-metal:linear-gradient(150deg,#48240d 0%,#2b0c05 52%,#1a0603 100%); --hold-inner-metal:linear-gradient(160deg,#341107 0%,#290803 50%,#170402 100%); --hold-emissive-color:rgba(249,115,22,.45); --hold-glow-color:rgba(251,146,60,.58); --hold-text:#fff3e0; --hold-sub:#fed7aa; }
+  .hold--active{ --hold-outer-metal:linear-gradient(150deg,#0f3a2b 0%,#082119 52%,#04120c 100%); --hold-inner-metal:linear-gradient(160deg,#06251a 0%,#041911 50%,#020d08 100%); --hold-emissive-color:rgba(34,197,94,.48); --hold-glow-color:rgba(16,185,129,.62); --hold-text:#ecfdf5; --hold-sub:#bbf7d0; }
+  .hold--ended{ --hold-outer-metal:linear-gradient(155deg,#331c58 0%,#1d0f38 55%,#0c0416 100%); --hold-inner-metal:linear-gradient(160deg,#220c46 0%,#18062e 50%,#090215 100%); --hold-emissive-color:rgba(168,85,247,.46); --hold-glow-color:rgba(147,197,253,.55); --hold-text:#ede9fe; --hold-sub:#ddd6fe; }
+  .hold--exhausted{ --hold-outer-metal:linear-gradient(155deg,#2f3338 0%,#1b1d22 52%,#0f1013 100%); --hold-inner-metal:linear-gradient(160deg,#1f2126 0%,#14161b 50%,#08090c 100%); --hold-emissive-color:rgba(148,163,184,.28); --hold-glow-color:rgba(148,163,184,.32); --hold-text:#cbd5f5; --hold-sub:#94a3b8; }
+  .hold.bonus,.hold--bonus{ --hold-outer-metal:linear-gradient(150deg,#3a2a08 0%,#1f1602 55%,#110b03 100%); --hold-inner-metal:linear-gradient(160deg,#2f2005 0%,#211503 52%,#140a02 100%); --hold-emissive-color:rgba(253,224,71,.55); --hold-glow-color:rgba(212,175,55,.65); --hold-text:#fef9c3; --hold-sub:#fde68a; }
+  .hold.no-hold{ --hold-outer-metal:linear-gradient(155deg,#3d1016 0%,#24070a 55%,#120204 100%); --hold-inner-metal:linear-gradient(160deg,#2f050c 0%,#220307 50%,#120104 100%); --hold-emissive-color:rgba(248,113,113,.45); --hold-glow-color:rgba(248,113,113,.6); --hold-text:#fee2e2; --hold-sub:#fecaca; }
+  .hold.no-hold .hold__outer-glow{ animation:holdNoWinnerPulse 1.4s ease-in-out infinite; }
   .round-result{ margin-top:10px; font-size:14px; color:var(--muted); font-weight:500; transition:color .2s ease, text-shadow .35s ease; }
   .round-result.round-result--alert{ color:#fecaca; font-weight:700; text-shadow:0 0 12px rgba(248,113,113,.45); }
 
@@ -309,7 +337,7 @@
   /* Heartbeat pulse */
   @keyframes hbBeat { 0%{transform:scale(1)} 40%{transform:scale(1.03)} 100%{transform:scale(1)} }
   .hold.hb-beat { animation: hbBeat 180ms ease-out; box-shadow: 0 0 0 0 rgba(16,185,129,.35); }
-  @keyframes noHoldPulse { 0%{box-shadow:0 0 0 4px rgba(248,113,113,.28);} 50%{box-shadow:0 0 0 12px rgba(248,113,113,.12);} 100%{box-shadow:0 0 0 4px rgba(248,113,113,.28);} }
+  @keyframes holdNoWinnerPulse{0%,100%{opacity:.68;transform:scale(1);}50%{opacity:.22;transform:scale(1.1);}}
 
 </style>
 </head>
@@ -414,8 +442,23 @@
         <span id="nextReadyCountdownPlayer" class="nextReadyPanel__countdown"></span>
       </div>
 
-      <div id="holdArea" class="hold idle" role="button" aria-pressed="false" aria-label="Press and hold">
-        <div><div id="holdText" class="holdText">Press & Hold</div><div id="holdSub" class="holdSub">Release = out (this round)</div></div>
+      <div id="holdArea" class="hold hold--idlePhase hold--ready" role="button" aria-pressed="false" aria-disabled="false" aria-label="Press and hold">
+        <div class="hold__outer" aria-hidden="true">
+          <div class="hold__outer-metal"></div>
+          <div class="hold__outer-glow"></div>
+        </div>
+        <div class="hold__inner" aria-hidden="true">
+          <div class="hold__plate">
+            <span class="hold__plate-highlight"></span>
+            <span class="hold__seam hold__seam--north"></span>
+            <span class="hold__seam hold__seam--south"></span>
+          </div>
+          <div class="hold__emissive"></div>
+        </div>
+        <div class="hold__label">
+          <div id="holdText" class="holdText">Press & Hold</div>
+          <div id="holdSub" class="holdSub">Release = out (this round)</div>
+        </div>
       </div>
 
       <div id="exhaustedMsg" class="toast" style="display:none">Your time bank is exhausted. You are spectating.</div>
