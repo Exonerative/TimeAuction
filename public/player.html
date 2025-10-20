@@ -59,7 +59,7 @@
   .ph-exhausted{background:#4b556320;color:#cbd5e1;border-color:#4b556355}
 
   /* Round timer */
-  .roundTimerPanel{position:relative;margin:14px 0 10px;padding:18px 22px;border-radius:24px;background:radial-gradient(circle at 12% 12%,rgba(59,130,246,.22) 0%,rgba(12,18,32,.35) 50%,rgba(10,13,22,.92) 100%);border:1px solid rgba(63,120,224,.45);box-shadow:0 18px 48px rgba(8,14,28,.55);display:grid;gap:10px;overflow:hidden;transition:border-color .28s ease,box-shadow .3s ease,transform .3s ease;
+  .roundTimerPanel{position:relative;margin:12px 0 10px;padding:18px 22px;border-radius:24px;background:radial-gradient(circle at 12% 12%,rgba(59,130,246,.22) 0%,rgba(12,18,32,.35) 50%,rgba(10,13,22,.92) 100%);border:1px solid rgba(63,120,224,.45);box-shadow:0 18px 48px rgba(8,14,28,.55);display:grid;gap:10px;overflow:hidden;transition:border-color .28s ease,box-shadow .3s ease,transform .3s ease;
     --timer-accent:#38bdf8;--timer-glow:rgba(56,189,248,.38);--timer-bg:rgba(15,23,42,.72);--timer-label:#cbd5f5;--timer-value:#f8fafc;
   }
   .roundTimerPanel::before{content:"";position:absolute;inset:-40% -30%;background:radial-gradient(circle at 24% 26%,var(--timer-glow) 0%,transparent 60%);opacity:.85;filter:blur(0);pointer-events:none;transition:opacity .28s ease,transform .6s ease;
@@ -108,7 +108,7 @@
   .round-result{ margin-top:10px; font-size:14px; color:var(--muted); font-weight:500; transition:color .2s ease, text-shadow .35s ease; }
   .round-result.round-result--alert{ color:#fecaca; font-weight:700; text-shadow:0 0 12px rgba(248,113,113,.45); }
 
-  .gameMeta{display:grid;gap:10px;margin:8px 0 2px;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .gameMeta{display:grid;gap:10px;margin:12px 0 4px;grid-template-columns:repeat(2,minmax(0,1fr))}
   @media (max-width:340px){ .gameMeta{grid-template-columns:1fr;} }
   .metaItem{background:#11141c;border:1px solid #1f2632;border-radius:14px;padding:12px 14px}
   .metaLabel{margin:0 0 6px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8}
@@ -284,12 +284,6 @@
         <span id="phaseCopy" class="phaseCopy">Waiting for host…</span>
       </div>
 
-      <!-- Round timer (Active phase) -->
-      <div id="roundTimerPanel" class="roundTimerPanel is-idle" role="timer" aria-live="polite">
-        <div class="roundTimerLabel">Round Timer</div>
-        <div class="roundTimerValue mono" id="roundTimer">00:00.000</div>
-      </div>
-
       <div class="gameMeta" id="gameMeta" aria-live="polite">
         <div class="metaItem">
           <div class="metaLabel">Match progress</div>
@@ -301,6 +295,12 @@
           <div id="timeBankValue" class="metaValue">—</div>
           <div id="timeBankDetail" class="metaSub" style="display:none">Per player at start</div>
         </div>
+      </div>
+
+      <!-- Round timer (Active phase) -->
+      <div id="roundTimerPanel" class="roundTimerPanel is-idle" role="timer" aria-live="polite">
+        <div class="roundTimerLabel">Round Timer</div>
+        <div class="roundTimerValue mono" id="roundTimer">00:00.000</div>
       </div>
 
       <div id="holdArea" class="hold idle" role="button" aria-pressed="false" aria-label="Press and hold">
