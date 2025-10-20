@@ -49,6 +49,7 @@
   const timeBankValueEl = document.getElementById('timeBankValue');
   const timeBankDetailEl = document.getElementById('timeBankDetail');
   const roundRecapPanel = document.getElementById('roundRecapPanel');
+  const roundRecapLabel = document.getElementById('roundRecapLabel');
   const roundRecapTitle = document.getElementById('roundRecapTitle');
   const roundRecapSubtitle = document.getElementById('roundRecapSubtitle');
   const roundRecapSummary = document.getElementById('roundRecapSummary');
@@ -63,6 +64,7 @@
   const roundRecapRoundsLeftNote = document.getElementById('roundRecapRoundsLeftNote');
   const roundRecapFooterNote = document.getElementById('roundRecapFooterNote');
   const roundRecapDismiss = document.getElementById('roundRecapDismiss');
+  const roundRecapClose = document.getElementById('roundRecapClose');
   const nextReadyPanel = document.getElementById('nextReadyPanel');
   const nextReadyStatus = document.getElementById('nextReadyStatus');
   const toggleReadyBtn = document.getElementById('toggleReadyBtn');
@@ -226,6 +228,17 @@
   }
   const nextReadyCountdownPlayer = document.getElementById('nextReadyCountdownPlayer');
   if (roundRecapDismiss){ roundRecapDismiss.addEventListener('click', ()=> hideRoundRecap(true)); }
+  if (roundRecapClose){ roundRecapClose.addEventListener('click', ()=> hideRoundRecap()); }
+  if (roundRecapPanel){
+    roundRecapPanel.addEventListener('click', (event)=>{
+      if (event.target === roundRecapPanel){ hideRoundRecap(); }
+    });
+  }
+  document.addEventListener('keydown', (event)=>{
+    if ((event.key === 'Escape' || event.key === 'Esc') && roundRecapPanel && roundRecapPanel.classList.contains('show')){
+      hideRoundRecap();
+    }
+  });
 
   const finalModal = document.getElementById('finalModal');
   const finalChampion = document.getElementById('finalChampion');
@@ -246,6 +259,7 @@
   let myTokensKnown = 0;
   let roundRecapAutoTimer = null;
   let roundRecapCloseTimer = null;
+  let roundRecapPrevFocus = null;
   let inlineAnnouncementTimer = null;
   let inlineAnnouncementText = null;
   let inlineAnnouncementPrev = '';
@@ -294,6 +308,17 @@
     if (roundRecapAutoTimer){ clearTimeout(roundRecapAutoTimer); roundRecapAutoTimer = null; }
     if (roundRecapCloseTimer){ clearTimeout(roundRecapCloseTimer); roundRecapCloseTimer = null; }
   }
+  function captureRoundRecapFocus(){
+    if (!roundRecapPanel || roundRecapPanel.classList.contains('show')) return;
+    const active = document.activeElement;
+    if (active && active !== document.body){ roundRecapPrevFocus = active; }
+  }
+  function restoreRoundRecapFocus(){
+    if (roundRecapPrevFocus && typeof roundRecapPrevFocus.focus === 'function'){
+      try{ roundRecapPrevFocus.focus(); }catch(e){}
+    }
+    roundRecapPrevFocus = null;
+  }
   function hideRoundRecap(immediate){
     if (!roundRecapPanel) return;
     clearRoundRecapTimers();
@@ -306,6 +331,7 @@
       roundRecapPanel.classList.remove('closing');
       roundRecapPanel.classList.remove('alert');
       if (roundRecapFooterNote) roundRecapFooterNote.textContent='';
+      restoreRoundRecapFocus();
       return;
     }
     roundRecapPanel.classList.add('closing');
@@ -315,6 +341,7 @@
       roundRecapPanel.classList.remove('alert');
       if (roundRecapFooterNote) roundRecapFooterNote.textContent='';
       roundRecapCloseTimer = null;
+      restoreRoundRecapFocus();
     }, 320);
   }
   function scheduleRoundRecapAutoHide(ms){
@@ -640,7 +667,13 @@
     if (!roundRecapPanel || !model) return;
     clearRoundRecapTimers();
     try{
-      if (roundRecapTitle) roundRecapTitle.textContent = model.title || 'Round recap';
+      captureRoundRecapFocus();
+      if (roundRecapLabel){
+        const subtitleText = (model.subtitle || '').trim();
+        const winnerSubtitle = /^winner\s*:/i.test(subtitleText);
+        roundRecapLabel.textContent = winnerSubtitle ? 'Round Winner' : 'Round Recap';
+      }
+      if (roundRecapTitle) roundRecapTitle.textContent = model.title || 'Round Recap';
       if (roundRecapSubtitle) roundRecapSubtitle.textContent = model.subtitle || '';
       if (roundRecapSummary) roundRecapSummary.textContent = model.summary || '';
       if (roundRecapLeader) roundRecapLeader.textContent = model.leaderValue || '—';
@@ -666,6 +699,19 @@
       const remain = nextReadyCountdownCfg ? Math.max(0, (nextReadyCountdownCfg.startTs + nextReadyCountdownCfg.durationMs) - serverNow()) : null;
       const autoHide = remain != null && remain > 0 ? Math.min(model.autoHideMs, Math.max(2200, remain + 1200)) : model.autoHideMs;
       scheduleRoundRecapAutoHide(autoHide);
+      if (roundRecapDismiss){
+        requestAnimationFrame(()=>{
+          if (roundRecapPanel && roundRecapPanel.classList.contains('show')){
+            try{ roundRecapDismiss.focus(); }catch(e){}
+          }
+        });
+      } else if (roundRecapClose){
+        requestAnimationFrame(()=>{
+          if (roundRecapPanel && roundRecapPanel.classList.contains('show')){
+            try{ roundRecapClose.focus(); }catch(e){}
+          }
+        });
+      }
     }catch(e){}
   }
   function updateNextReadyUI(){
