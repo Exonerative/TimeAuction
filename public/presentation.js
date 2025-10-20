@@ -43,6 +43,21 @@
   let lastNoHoldRound = null;
 
   function pad(value){ return String(value).padStart(2, '0'); }
+  function getDurationParts(ms){
+    if (!Number.isFinite(ms) || ms < 0) return null;
+    const totalSeconds = Math.max(0, ms) / 1000;
+    let minutes = Math.floor(totalSeconds / 60);
+    let seconds = totalSeconds - (minutes * 60);
+    seconds = Math.round(seconds * 10) / 10;
+    if (seconds >= 60){
+      minutes += 1;
+      seconds = 0;
+    }
+    return { minutes, seconds };
+  }
+  function pluralizeDuration(value, singular, plural){
+    return Math.abs(value - 1) < 1e-9 ? singular : plural;
+  }
   function formatClock(ms){
     if (!Number.isFinite(ms)) return '00:00';
     const seconds = Math.max(0, Math.floor(ms / 1000));
@@ -51,9 +66,16 @@
     return `${pad(minutes)}:${pad(secs)}`;
   }
   function formatMs(ms){
-    if (!Number.isFinite(ms) || ms <= 0) return '—';
-    const seconds = (ms / 1000).toFixed(1);
-    return `${seconds.replace(/\.0$/, '')}s`;
+    const parts = getDurationParts(ms);
+    if (!parts) return '—';
+    const { minutes, seconds } = parts;
+    const secondsLabel = pluralizeDuration(seconds, 'second', 'seconds');
+    const secondsText = seconds.toFixed(1);
+    if (minutes > 0){
+      const minutesLabel = pluralizeDuration(minutes, 'minute', 'minutes');
+      return `${minutes} ${minutesLabel} ${secondsText} ${secondsLabel}`;
+    }
+    return `${secondsText} ${secondsLabel}`;
   }
   function computeDefaultStatus(){
     if (!latestState.started) return 'Waiting for host…';
@@ -334,21 +356,48 @@
       const meta = document.createElement('span');
       meta.className = 'meta';
       const tokens = entry.winnerTokens != null ? `${entry.winnerTokens} 🪙` : '—';
-      const hold = formatMs(entry.winnerMs);
       const when = entry.ts ? new Date(entry.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
       const metaParts = [];
-      if (isNoHold){
-        metaParts.push('No holds recorded');
-      } else {
-        if (tokens !== '—') metaParts.push(tokens);
-        if (hold !== '—') metaParts.push(`hold ${hold}`);
-      }
+      if (tokens !== '—') metaParts.push(tokens);
       if (when) metaParts.push(when);
-      meta.textContent = metaParts.join(' · ');
+      meta.textContent = metaParts.length ? metaParts.join(' · ') : (isNoHold ? 'No tokens awarded' : '—');
+      const holdStat = document.createElement('div');
+      holdStat.className = 'hold-stat';
+      if (isNoHold){
+        holdStat.classList.add('no-value');
+        holdStat.textContent = 'No hold recorded';
+      } else {
+        const parts = getDurationParts(entry.winnerMs);
+        if (parts){
+          holdStat.setAttribute('aria-label', `Hold duration ${formatMs(entry.winnerMs)}`);
+          const segments = [];
+          if (parts.minutes > 0){
+            segments.push({ value: String(parts.minutes), unit: pluralizeDuration(parts.minutes, 'minute', 'minutes') });
+          }
+          segments.push({ value: parts.seconds.toFixed(1), unit: pluralizeDuration(parts.seconds, 'second', 'seconds') });
+          segments.forEach((segment)=>{
+            const segEl = document.createElement('span');
+            segEl.className = 'hold-segment';
+            const valueEl = document.createElement('span');
+            valueEl.className = 'hold-value';
+            valueEl.textContent = segment.value;
+            const unitEl = document.createElement('span');
+            unitEl.className = 'hold-unit';
+            unitEl.textContent = segment.unit;
+            segEl.appendChild(valueEl);
+            segEl.appendChild(unitEl);
+            holdStat.appendChild(segEl);
+          });
+        } else {
+          holdStat.classList.add('no-value');
+          holdStat.textContent = 'Hold time unavailable';
+        }
+      }
       details.appendChild(round);
       details.appendChild(winner);
       details.appendChild(meta);
       li.appendChild(details);
+      li.appendChild(holdStat);
       historyList.appendChild(li);
       li.classList.add('enter');
       setTimeout(()=> li.classList.remove('enter'), 1800);
@@ -513,12 +562,12 @@
     }
     if (spotlightHold){
       const holdText = formatMs(info.winnerMs);
-      const safeHold = holdText !== '—' ? holdText : '0s';
       spotlightHold.innerHTML = '';
-      const strong = document.createElement('strong');
-      strong.textContent = safeHold;
-      spotlightHold.appendChild(strong);
-      spotlightHold.appendChild(document.createTextNode(' hold'));
+      if (holdText !== '—'){
+        spotlightHold.textContent = `${holdText} hold`;
+      } else {
+        spotlightHold.textContent = 'No hold recorded';
+      }
     }
     if (spotlightRound){
       const round = info.round != null ? info.round : '?';

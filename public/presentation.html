@@ -437,9 +437,10 @@
       display:flex;
       justify-content:space-between;
       gap:18px;
-      align-items:center;
+      align-items:flex-end;
       position:relative;
       overflow:hidden;
+      flex-wrap:wrap;
     }
     .history-item.no-hold{
       border-color:rgba(255,108,108,0.38);
@@ -455,10 +456,53 @@
       background:linear-gradient(100deg,transparent,rgba(246,165,93,0.2),transparent);
       animation:statusSweep 1.6s ease;
     }
-    .history-item .details{display:flex;flex-direction:column;gap:4px;}
+    .history-item .details{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0;}
     .history-item .round{font-weight:700;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase;}
     .history-item .winner{font-size:1.05rem;font-weight:600;}
     .history-item .meta{font-size:0.95rem;color:var(--muted);letter-spacing:0.05em;}
+    .history-item .hold-stat{
+      display:flex;
+      align-items:flex-end;
+      justify-content:flex-end;
+      gap:14px;
+      flex-wrap:wrap;
+      text-align:right;
+      font-family:"Orbitron",system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+      flex:none;
+    }
+    .history-item .hold-segment{
+      display:flex;
+      flex-direction:column;
+      align-items:flex-end;
+      gap:4px;
+    }
+    .history-item .hold-value{
+      font-size:clamp(1.35rem,2.6vw,2.1rem);
+      font-weight:700;
+      letter-spacing:0.08em;
+      color:var(--accent);
+      text-shadow:0 0 18px rgba(56,213,255,0.45);
+    }
+    .history-item .hold-unit{
+      font-size:0.7rem;
+      letter-spacing:0.22em;
+      text-transform:uppercase;
+      color:rgba(248,250,252,0.7);
+    }
+    .history-item .hold-stat.no-value{
+      font-size:0.95rem;
+      font-weight:500;
+      color:rgba(248,250,252,0.72);
+      text-align:right;
+      letter-spacing:0.05em;
+    }
+    .history-item.no-hold .hold-value{
+      color:#ffb4c4;
+      text-shadow:0 0 18px rgba(255,138,138,0.35);
+    }
+    .history-item.no-hold .hold-unit{
+      color:rgba(255,214,214,0.85);
+    }
     .empty-note{color:var(--muted);font-style:italic;letter-spacing:0.08em;}
     .empty-note::before{content:"// ";opacity:0.5;}
     .vignette{
@@ -665,6 +709,9 @@
       main.command-deck{grid-template-rows:minmax(0,0.52fr) minmax(0,0.24fr) minmax(0,0.24fr);}
       .timer-card{padding:32px 28px;}
       .timer-label{letter-spacing:0.18em;}
+      .history-item{flex-direction:column;align-items:flex-start;gap:16px;}
+      .history-item .hold-stat{width:100%;justify-content:flex-start;text-align:left;}
+      .history-item .hold-segment{align-items:flex-start;}
     }
     @media (max-width:640px){
       .layout{padding:16px;}
@@ -731,7 +778,7 @@
       <div class="spotlight-name" id="spotlightWinnerName">—</div>
       <div class="spotlight-stats">
         <span id="spotlightTokens"><strong>0</strong>🪙</span>
-        <span id="spotlightHold"><strong>0s</strong> hold</span>
+        <span id="spotlightHold">0.0 seconds hold</span>
       </div>
       <div class="spotlight-footer">Prepare for the next challenge</div>
     </div>
