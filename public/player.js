@@ -51,6 +51,7 @@
   const roundRecapPanel = document.getElementById('roundRecapPanel');
   const roundRecapLabel = document.getElementById('roundRecapLabel');
   const roundRecapTitle = document.getElementById('roundRecapTitle');
+  const roundRecapChampion = document.getElementById('roundRecapChampion');
   const roundRecapSubtitle = document.getElementById('roundRecapSubtitle');
   const roundRecapSummary = document.getElementById('roundRecapSummary');
   const roundRecapLeader = document.getElementById('roundRecapLeader');
@@ -635,13 +636,20 @@
     const roundLabel = round > 0 ? `Round ${round}` : 'Round recap';
     const title = `${roundLabel}${totalRounds ? ` · ${totalRounds} total` : ''}`;
     let subtitle;
+    let championName = null;
+    let detailParts = [];
     let summary;
     let fallbackText;
     if (winnerName){
       const held = winnerMs != null ? fmt(winnerMs) : '—';
+      championName = winnerName;
       subtitle = `Winner: ${winnerName}${winnerTokens != null ? ` · 🏆 ${winnerTokens}` : ''}`;
       summary = `${winnerName} held for ${held}${bonusValue && bonusValue > 1 ? ` · Bonus ×${bonusValue}` : ''}.`;
       fallbackText = `${roundLabel}: ${winnerName} held ${held}${winnerTokens != null ? ` · 🏆 ${winnerTokens}` : ''}`;
+      const holdDetail = `Hold ${held}`;
+      const tokensDetail = winnerTokens != null ? `🏆 ${formatTokens(winnerTokens)}` : null;
+      const bonusDetail = `Bonus ×${bonusValue != null ? bonusValue : 1}`;
+      detailParts = [holdDetail, tokensDetail, bonusDetail].filter(Boolean);
     } else if (isNoHold){
       subtitle = 'Nobody held this round';
       summary = 'The round ended with zero holds — the pot stays put.';
@@ -682,6 +690,8 @@
       fallback: fallbackText,
       autoHideMs: 10000,
       tone: isNoHold ? 'danger' : 'default',
+      championName,
+      detailParts,
     };
   }
 
@@ -690,13 +700,25 @@
     clearRoundRecapTimers();
     try{
       captureRoundRecapFocus();
+      const hasChampion = !!(model.championName && String(model.championName).trim());
       if (roundRecapLabel){
-        const subtitleText = (model.subtitle || '').trim();
-        const winnerSubtitle = /^winner\s*:/i.test(subtitleText);
-        roundRecapLabel.textContent = winnerSubtitle ? 'Round Winner' : 'Round Recap';
+        roundRecapLabel.textContent = hasChampion ? 'Round Winner' : 'Round Recap';
       }
       if (roundRecapTitle) roundRecapTitle.textContent = model.title || 'Round Recap';
-      if (roundRecapSubtitle) roundRecapSubtitle.textContent = model.subtitle || '';
+      if (roundRecapChampion){
+        if (hasChampion){
+          roundRecapChampion.hidden = false;
+          roundRecapChampion.textContent = model.championName;
+        } else {
+          roundRecapChampion.hidden = true;
+          roundRecapChampion.textContent = '';
+        }
+      }
+      const winnerDetails = Array.isArray(model.detailParts) ? model.detailParts.filter(Boolean) : [];
+      const detailText = hasChampion
+        ? (winnerDetails.length ? winnerDetails.join(' · ') : (model.subtitle || ''))
+        : (model.subtitle || '');
+      if (roundRecapSubtitle) roundRecapSubtitle.textContent = detailText;
       if (roundRecapSummary) roundRecapSummary.textContent = model.summary || '';
       if (roundRecapLeader) roundRecapLeader.textContent = model.leaderValue || '—';
       if (roundRecapLeaderNote) roundRecapLeaderNote.textContent = model.leaderNote || '';
@@ -714,6 +736,7 @@
           if (roundRecapBonusNote){ roundRecapBonusNote.textContent = ''; }
         }
       }
+      roundRecapPanel.classList.toggle('has-winner', hasChampion);
       roundRecapPanel.classList.remove('closing');
       roundRecapPanel.classList.toggle('alert', model.tone === 'danger');
       roundRecapPanel.classList.add('show');
