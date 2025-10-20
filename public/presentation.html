@@ -495,6 +495,11 @@
       text-align:center;
       overflow:hidden;
     }
+    .winner-spotlight.no-hold .spotlight-core{
+      background:linear-gradient(160deg,rgba(40,9,18,0.95),rgba(72,16,28,0.82));
+      border-color:rgba(255,110,110,0.55);
+      box-shadow:0 42px 160px rgba(255,96,96,0.28);
+    }
     .winner-spotlight.active .spotlight-core{
       animation:spotlightReveal 0.85s cubic-bezier(0.23,1,0.32,1);
     }
@@ -523,12 +528,20 @@
       text-transform:uppercase;
       color:var(--muted);
     }
+    .winner-spotlight.no-hold .spotlight-round{
+      border-color:rgba(255,110,110,0.55);
+      background:rgba(78,12,24,0.65);
+      color:#ffd7dc;
+    }
     .spotlight-title{
       margin-top:18px;
       font-size:1rem;
       letter-spacing:0.28em;
       text-transform:uppercase;
       color:rgba(255,255,255,0.75);
+    }
+    .winner-spotlight.no-hold .spotlight-title{
+      color:#ffd6db;
     }
     .spotlight-name{
       margin:18px 0 12px;
@@ -537,6 +550,10 @@
       letter-spacing:0.08em;
       color:#e6f9ff;
       text-shadow:0 0 42px rgba(56,213,255,0.7);
+    }
+    .winner-spotlight.no-hold .spotlight-name{
+      color:#ffe5ea;
+      text-shadow:0 0 36px rgba(255,110,110,0.6);
     }
     .spotlight-stats{
       display:flex;
@@ -548,7 +565,9 @@
       color:var(--muted);
     }
     .spotlight-stats span{display:flex;align-items:center;gap:6px;}
+    .winner-spotlight.no-hold .spotlight-stats span{color:#ffd6db;}
     .spotlight-stats strong{font-size:1.1rem;color:#f8fafc;}
+    .winner-spotlight.no-hold .spotlight-stats strong{color:#ffe5ea;}
     .spotlight-footer{
       margin-top:28px;
       font-size:0.9rem;
@@ -556,12 +575,14 @@
       text-transform:uppercase;
       color:rgba(255,255,255,0.6);
     }
+    .winner-spotlight.no-hold .spotlight-footer{color:#ffbdc6;}
     .spotlight-confetti{
       position:absolute;
       inset:0;
       pointer-events:none;
       overflow:hidden;
     }
+    .winner-spotlight.no-hold .spotlight-confetti{display:none;}
     .spotlight-confetti span{
       position:absolute;
       width:6px;
@@ -727,13 +748,13 @@
     <div class="spotlight-core">
       <div class="spotlight-confetti" aria-hidden="true"></div>
       <span class="spotlight-round" id="spotlightRound">Round 0</span>
-      <div class="spotlight-title">Champion of the round</div>
+      <div class="spotlight-title" id="spotlightTitle">Champion of the round</div>
       <div class="spotlight-name" id="spotlightWinnerName">—</div>
       <div class="spotlight-stats">
         <span id="spotlightTokens"><strong>0</strong>🪙</span>
         <span id="spotlightHold"><strong>0s</strong> hold</span>
       </div>
-      <div class="spotlight-footer">Prepare for the next challenge</div>
+      <div class="spotlight-footer" id="spotlightFooter">Prepare for the next challenge</div>
     </div>
   </div>
   </div>
