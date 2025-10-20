@@ -12,6 +12,8 @@
   const serverNow = ()=> (window.__getServerNow ? window.__getServerNow() : Date.now());
 
   const joinCard = document.getElementById('joinCard');
+  const joinHeader = document.getElementById('joinHeader');
+  const joinRulesPanel = document.getElementById('joinRulesPanel');
   const gameCard = document.getElementById('gameCard');
   const joinBtn = document.getElementById('join');
   const reconnectBtn = document.getElementById('reconnect');
@@ -764,6 +766,8 @@
     pendingResumeReason = null;
     setStatus('');
     joinCard.style.display='none'; gameCard.style.display='block';
+    if (joinHeader){ joinHeader.style.display='none'; joinHeader.setAttribute('aria-hidden','true'); }
+    if (joinRulesPanel){ joinRulesPanel.style.display='none'; joinRulesPanel.setAttribute('aria-hidden','true'); }
     askNotifyPermission();
     setPhaseUI('idle'); updateHoldVisual(); stopTimer(); cancelHeartbeat();
     updateNextReadyUI();
