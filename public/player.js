@@ -1092,6 +1092,10 @@
     if (finalModal){ finalModal.classList.remove('show'); }
     nextReadyCountdownCfg = null;
     stopNextReadyCountdown();
+    if (nextReadyState){
+      nextReadyState = Object.assign({}, nextReadyState);
+      delete nextReadyState.countdown;
+    }
     if (nextReadyCountdownPlayer){ nextReadyCountdownPlayer.style.display='none'; nextReadyCountdownPlayer.textContent=''; }
     updateNextReadyUI();
     latestLobby.started = true;
