@@ -43,6 +43,7 @@
   const phaseBadge = document.getElementById('phaseBadge');
   const phaseCopy  = document.getElementById('phaseCopy');
   const roundTimerEl = document.getElementById('roundTimer');
+  const roundTimerPanel = document.getElementById('roundTimerPanel');
   const roundStatusEl = document.getElementById('roundStatus');
   const roundStatusDetailEl = document.getElementById('roundStatusDetail');
   const timeBankValueEl = document.getElementById('timeBankValue');
@@ -708,31 +709,40 @@
   function setPhaseUI(tag){
     phase = tag;
     const cls = ['ph-idle','ph-arming','ph-countdown','ph-active','ph-ended','ph-exhausted'];
+    const timerCls = ['is-idle','is-arming','is-countdown','is-active','is-ended','is-exhausted'];
     phaseBadge.classList.remove(...cls);
+    if (roundTimerPanel){ roundTimerPanel.classList.remove(...timerCls); }
     switch(tag){
       case 'arming':
         phaseBadge.textContent = 'Arming'; phaseBadge.classList.add('ph-arming');
         phaseCopy.textContent  = 'Press & hold now — all players must hold to start';
+        if (roundTimerPanel){ roundTimerPanel.classList.add('is-arming'); }
         break;
       case 'countdown':
         phaseBadge.textContent = 'Countdown'; phaseBadge.classList.add('ph-countdown');
         phaseCopy.textContent  = 'Release = out (this round)';
+        if (roundTimerPanel){ roundTimerPanel.classList.add('is-countdown'); }
         break;
       case 'active':
         phaseBadge.textContent = 'Active'; phaseBadge.classList.add('ph-active');
         phaseCopy.textContent  = 'Bank draining — keep holding';
+        if (roundTimerPanel){ roundTimerPanel.classList.add('is-active'); }
         break;
       case 'ended':
         phaseBadge.textContent = 'Game over'; phaseBadge.classList.add('ph-ended');
         phaseCopy.textContent  = 'See final results below';
+        if (roundTimerPanel){ roundTimerPanel.classList.add('is-ended'); }
         break;
       case 'exhausted':
         phaseBadge.textContent = 'Exhausted'; phaseBadge.classList.add('ph-exhausted');
         phaseCopy.textContent  = 'You’re spectating until next match';
+        if (roundTimerPanel){ roundTimerPanel.classList.add('is-exhausted'); }
         break;
       default:
         phaseBadge.textContent = 'Idle'; phaseBadge.classList.add('ph-idle');
         phaseCopy.textContent  = 'Waiting for host…';
+        if (roundTimerPanel){ roundTimerPanel.classList.add('is-idle'); }
+        break;
     }
     updateNextReadyUI();
     updateMatchMeta();

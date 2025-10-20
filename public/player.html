@@ -58,6 +58,41 @@
   .ph-ended{background:#6d28d920;color:#c4b5fd;border-color:#6d28d955}
   .ph-exhausted{background:#4b556320;color:#cbd5e1;border-color:#4b556355}
 
+  /* Round timer */
+  .roundTimerPanel{position:relative;margin:14px 0 10px;padding:18px 22px;border-radius:24px;background:radial-gradient(circle at 12% 12%,rgba(59,130,246,.22) 0%,rgba(12,18,32,.35) 50%,rgba(10,13,22,.92) 100%);border:1px solid rgba(63,120,224,.45);box-shadow:0 18px 48px rgba(8,14,28,.55);display:grid;gap:10px;overflow:hidden;transition:border-color .28s ease,box-shadow .3s ease,transform .3s ease;
+    --timer-accent:#38bdf8;--timer-glow:rgba(56,189,248,.38);--timer-bg:rgba(15,23,42,.72);--timer-label:#cbd5f5;--timer-value:#f8fafc;
+  }
+  .roundTimerPanel::before{content:"";position:absolute;inset:-40% -30%;background:radial-gradient(circle at 24% 26%,var(--timer-glow) 0%,transparent 60%);opacity:.85;filter:blur(0);pointer-events:none;transition:opacity .28s ease,transform .6s ease;
+  }
+  .roundTimerPanel::after{content:"";position:absolute;inset:1px;border-radius:22px;border:1px solid rgba(148,197,255,.24);opacity:.8;pointer-events:none;mix-blend-mode:screen}
+  .roundTimerLabel{position:relative;z-index:1;font-size:12px;letter-spacing:.26em;text-transform:uppercase;color:var(--timer-label);font-weight:700;display:flex;align-items:center;gap:10px}
+  .roundTimerLabel::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,rgba(148,197,255,.18) 0%,rgba(148,197,255,.5) 60%,transparent 100%);border-radius:99px;opacity:.8}
+  .roundTimerValue{position:relative;z-index:1;font-size:clamp(32px,10vw,58px);font-weight:900;letter-spacing:.08em;color:var(--timer-value);text-shadow:0 10px 28px rgba(14,23,42,.75),0 0 18px var(--timer-glow);transition:color .28s ease,text-shadow .28s ease}
+  .roundTimerPanel.is-idle{--timer-accent:#38bdf8;--timer-glow:rgba(56,189,248,.35);--timer-label:#cbd5f5;--timer-bg:rgba(15,23,42,.72)}
+  .roundTimerPanel.is-arming{--timer-accent:#fbbf24;--timer-glow:rgba(251,191,36,.32);--timer-label:#fcd34d;--timer-value:#fef3c7;transform:translateY(0);box-shadow:0 20px 54px rgba(92,64,12,.45)}
+  .roundTimerPanel.is-countdown{--timer-accent:#fb923c;--timer-glow:rgba(251,146,60,.38);--timer-label:#fdba74;--timer-value:#fff7ed;animation:roundTimerPulse 1.4s ease-in-out infinite}
+  .roundTimerPanel.is-active{--timer-accent:#34d399;--timer-glow:rgba(52,211,153,.38);--timer-label:#bbf7d0;--timer-value:#ecfdf5;animation:roundTimerPulse 1.1s ease-in-out infinite;box-shadow:0 24px 60px rgba(12,56,40,.55)}
+  .roundTimerPanel.is-ended{--timer-accent:#a855f7;--timer-glow:rgba(168,85,247,.34);--timer-label:#ddd6fe;--timer-value:#ede9fe;box-shadow:0 20px 48px rgba(67,26,120,.45)}
+  .roundTimerPanel.is-exhausted{--timer-accent:#94a3b8;--timer-glow:rgba(148,163,184,.28);--timer-label:#cbd5f5;--timer-value:#e2e8f0;opacity:.9;box-shadow:0 18px 40px rgba(11,13,18,.4)}
+  .roundTimerPanel.is-idle::before,.roundTimerPanel.is-ended::before,.roundTimerPanel.is-exhausted::before{transform:translate3d(0,0,0)}
+  .roundTimerPanel.is-countdown::before{opacity:.95;transform:translate3d(4%,4%,0)}
+  .roundTimerPanel.is-active::before{opacity:1;animation:roundTimerSweep 3s linear infinite}
+  .roundTimerPanel.is-arming::before{opacity:.92;transform:translate3d(-6%,-4%,0)}
+  .roundTimerPanel.is-idle,.roundTimerPanel.is-ended,.roundTimerPanel.is-exhausted{animation:none}
+  .roundTimerPanel .roundTimerValue::after{content:"";position:absolute;inset:auto 0 -8px;height:2px;background:linear-gradient(90deg,transparent 0%,var(--timer-accent) 45%,transparent 100%);opacity:.55;border-radius:999px;pointer-events:none}
+  @keyframes roundTimerPulse{0%{transform:translateY(0) scale(1);}50%{transform:translateY(-2px) scale(1.01);}100%{transform:translateY(0) scale(1);}}
+  @keyframes roundTimerSweep{0%{transform:translate(-10%, -10%) rotate(0deg);}50%{transform:translate(6%,6%) rotate(1turn);}100%{transform:translate(-10%, -10%) rotate(2turn);}}
+  @media (max-width:540px){
+    .roundTimerPanel{padding:16px 18px;border-radius:20px;margin:12px 0 8px}
+    .roundTimerLabel{font-size:11px;letter-spacing:.2em}
+    .roundTimerValue{font-size:clamp(28px,16vw,48px)}
+  }
+  @media (max-width:400px){
+    .roundTimerPanel{padding:14px 16px}
+    .roundTimerLabel{letter-spacing:.16em}
+    .roundTimerValue{font-size:clamp(26px,18vw,44px)}
+  }
+
   /* Circular hold button */
   .hold.bonus{ background:#231a00; border-color:#d4af37; box-shadow:0 0 0 2px rgba(212,175,55,.25) inset; }
   .hold{ width:min(72vw, 420px); height:min(72vw, 420px); max-width:420px; max-height:420px; min-width:220px; min-height:220px; border-radius:9999px; margin:18px auto 6px; display:flex; align-items:center; justify-content:center; user-select:none; -webkit-user-select:none; touch-action:manipulation; border:6px solid transparent; transition:transform .08s ease, background .15s ease, border-color .15s ease, opacity .15s ease; }
@@ -231,7 +266,10 @@
       </div>
 
       <!-- Round timer (Active phase) -->
-      <div class="muted">Round timer: <span id="roundTimer" class="mono">00:00.000</span></div>
+      <div id="roundTimerPanel" class="roundTimerPanel is-idle" role="timer" aria-live="polite">
+        <div class="roundTimerLabel">Round Timer</div>
+        <div class="roundTimerValue mono" id="roundTimer">00:00.000</div>
+      </div>
 
       <div class="gameMeta" id="gameMeta" aria-live="polite">
         <div class="metaItem">
