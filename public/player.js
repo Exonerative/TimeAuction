@@ -714,22 +714,32 @@
       }
     }catch(e){}
   }
+  function showNextReadyPanel(){
+    if (!nextReadyPanel) return;
+    nextReadyPanel.classList.add('show');
+    nextReadyPanel.setAttribute('aria-hidden','false');
+    nextReadyPanel.style.removeProperty('display');
+  }
+  function hideNextReadyPanel(){
+    if (!nextReadyPanel) return;
+    nextReadyPanel.classList.remove('show');
+    nextReadyPanel.setAttribute('aria-hidden','true');
+    nextReadyPanel.style.removeProperty('display');
+  }
   function updateNextReadyUI(){
     if (!nextReadyPanel || !toggleReadyBtn) return;
     const active = !!(nextReadyState && nextReadyState.active && joined && phase === 'idle' && !roundActive);
     if (!active){
       nextReadyCountdownCfg = null;
-      nextReadyPanel.classList.remove('show');
-      nextReadyPanel.setAttribute('aria-hidden','true');
+      hideNextReadyPanel();
       toggleReadyBtn.classList.remove('btn-ready-highlight');
       if (nextReadyCountdownPlayer){ nextReadyCountdownPlayer.style.display = 'none'; nextReadyCountdownPlayer.textContent=''; }
       stopNextReadyCountdown();
       syncRoundRecapCountdown(null);
       return;
     }
-    const panelWasHidden = !nextReadyPanel.classList.contains('show');
-    nextReadyPanel.classList.add('show');
-    nextReadyPanel.setAttribute('aria-hidden','false');
+    const panelWasHidden = !nextReadyPanel.classList.contains('show') || nextReadyPanel.getAttribute('aria-hidden') !== 'false';
+    showNextReadyPanel();
     const readyCount = nextReadyState.readyCount || 0;
     const requiredCount = nextReadyState.requiredCount || 0;
     const eligible = nextReadyState.eligibleCount || requiredCount;
@@ -968,7 +978,7 @@
   });
 
   socket.on('arming_started', ()=>{
-    nextReadyCountdownCfg = null; stopNextReadyCountdown(); if (nextReadyCountdownPlayer) nextReadyCountdownPlayer.style.display='none'; if (nextReadyPanel) nextReadyPanel.style.display='none';
+    nextReadyCountdownCfg = null; stopNextReadyCountdown(); if (nextReadyCountdownPlayer) nextReadyCountdownPlayer.style.display='none'; hideNextReadyPanel();
     hideRoundRecap(true);
     clearNoHoldVisual();
     if (roundResult) roundResult.textContent='';
@@ -1096,7 +1106,7 @@
   });
 
   socket.on('game_over', (d)=>{
-    nextReadyCountdownCfg = null; stopNextReadyCountdown(); if (nextReadyPanel) nextReadyPanel.style.display='none'; if (nextReadyCountdownPlayer) nextReadyCountdownPlayer.style.display='none';
+    nextReadyCountdownCfg = null; stopNextReadyCountdown(); hideNextReadyPanel(); if (nextReadyCountdownPlayer) nextReadyCountdownPlayer.style.display='none';
     hideRoundRecap(true);
     clearNoHoldVisual();
     setPhaseUI('ended');
