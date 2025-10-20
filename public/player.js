@@ -19,6 +19,9 @@
   const pinInput = document.getElementById('pin');
   const myPinEl = document.getElementById('myPin');
   const savedSessionEl = document.getElementById('savedSession');
+  const resumeGroup = document.getElementById('resumeGroup');
+  const nameHelper = document.getElementById('nameHelper');
+  const showResumeToggle = document.getElementById('showResume');
   const statusMsg = document.getElementById('statusMsg');
 
   const playerName = document.getElementById('playerName');
@@ -64,6 +67,14 @@
   let shouldAutoResume = !!(sessionInfo && !document.hidden);
   let resumeInFlight = false;
   let pendingResumeReason = null;
+  let resumeManuallyShown = false;
+
+  if (showResumeToggle){
+    showResumeToggle.addEventListener('click', ()=>{
+      resumeManuallyShown = true;
+      updateSavedSessionUI();
+    });
+  }
 
   function loadSession(){
     try{
@@ -85,20 +96,45 @@
     shouldAutoResume = false;
     resumeInFlight = false;
     pendingResumeReason = null;
+    resumeManuallyShown = false;
     saveSession(null);
     updateSavedSessionUI();
   }
   function updateSavedSessionUI(){
-    if (!savedSessionEl) return;
-    if (sessionInfo && sessionInfo.pin){
-      savedSessionEl.style.display = 'block';
-      savedSessionEl.textContent = `Saved PIN ${sessionInfo.pin}${sessionInfo.name ? ` · ${sessionInfo.name}` : ''}`;
-      if (pinInput){ pinInput.value = sessionInfo.pin; }
-      if (nameInput && !nameInput.value && sessionInfo.name){ nameInput.value = sessionInfo.name; }
-      if (reconnectBtn){ reconnectBtn.disabled = false; }
-    } else {
-      savedSessionEl.style.display = 'none';
-      if (reconnectBtn){ reconnectBtn.disabled = false; }
+    const hasSession = !!(sessionInfo && sessionInfo.pin);
+    if (savedSessionEl){
+      if (hasSession){
+        savedSessionEl.style.display = 'block';
+        savedSessionEl.textContent = `Saved PIN ${sessionInfo.pin}${sessionInfo.name ? ` · ${sessionInfo.name}` : ''}`;
+        if (pinInput){ pinInput.value = sessionInfo.pin; }
+        if (nameInput && !nameInput.value && sessionInfo.name){ nameInput.value = sessionInfo.name; }
+        if (reconnectBtn){ reconnectBtn.disabled = false; }
+        resumeManuallyShown = true;
+      } else {
+        savedSessionEl.style.display = 'none';
+        if (reconnectBtn){ reconnectBtn.disabled = false; }
+      }
+    }
+    const shouldShowResume = resumeManuallyShown || hasSession;
+    if (resumeGroup){ resumeGroup.style.display = shouldShowResume ? 'block' : 'none'; }
+    if (showResumeToggle){ showResumeToggle.style.display = shouldShowResume ? 'none' : 'inline-block'; }
+    if (nameHelper){
+      nameHelper.textContent = hasSession
+        ? 'Welcome back! Enter your PIN to hop back in.'
+        : 'We’ll generate your PIN right after launch.';
+    }
+    if (shouldShowResume){
+      if (hasSession && pinInput){
+        try{ pinInput.focus({ preventScroll: true }); }
+        catch(e){ try{ pinInput.focus(); }catch(_e){} }
+        try{ pinInput.select(); }catch(e){}
+      } else if (resumeManuallyShown && pinInput){
+        try{ pinInput.focus({ preventScroll: true }); }
+        catch(e){ try{ pinInput.focus(); }catch(_e){} }
+      }
+    } else if (nameInput && (!document.activeElement || document.activeElement === document.body || document.activeElement === pinInput)){
+      try{ nameInput.focus({ preventScroll: true }); }
+      catch(e){ try{ nameInput.focus(); }catch(_e){} }
     }
   }
   function setStatus(text){
