@@ -643,8 +643,12 @@ app.get('/host', async (req,res)=>{
   const hostHtml = fs.readFileSync(path.join(__dirname, 'public', 'host.html'), 'utf8').replace(/__JOIN_URL__/g, joinUrl).replace(/__QR_DATA__/g, qr);
   res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.send(hostHtml);
 });
-app.get('/presentation', (req,res)=>{
-  const html = fs.readFileSync(path.join(__dirname, 'public', 'presentation.html'), 'utf8');
+app.get('/presentation', async (req,res)=>{
+  const ip = getLANAddress();
+  const joinUrl = `http://${ip}:${PORT}/player`; const qr = await QRCode.toDataURL(joinUrl);
+  const html = fs.readFileSync(path.join(__dirname, 'public', 'presentation.html'), 'utf8')
+    .replace(/__JOIN_URL__/g, joinUrl)
+    .replace(/__QR_DATA__/g, qr);
   res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.send(html);
 });
 app.get('/player', (req,res)=>{
