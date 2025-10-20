@@ -152,32 +152,51 @@
   .link{ color:#93c5fd; text-decoration:underline }
 
   /* Round recap panel */
-  #roundRecapPanel{position:fixed;inset:0;display:flex;align-items:flex-end;justify-content:center;padding:16px 18px 24px;z-index:220;pointer-events:none;transition:visibility .28s ease;visibility:hidden}
-  #roundRecapPanel.show{visibility:visible;pointer-events:auto}
-  #roundRecapPanel .round-recap{max-width:540px;width:100%;background:#0b0f18;border:1px solid #1f2632;border-radius:20px;box-shadow:0 18px 48px rgba(0,0,0,.45);overflow:hidden;transform:translateY(32px);opacity:0;transition:transform .28s ease,opacity .28s ease;pointer-events:auto}
-  #roundRecapPanel.show .round-recap{transform:translateY(0);opacity:1}
-  #roundRecapPanel.closing .round-recap{transform:translateY(32px);opacity:0}
-  #roundRecapPanel.alert .round-recap__header{background:linear-gradient(135deg,#3f1f2a 0%,#2a0e15 80%,#220910 100%);color:#ffe4e6}
-  #roundRecapPanel.alert .round-recap__subtitle{color:#fecaca}
-  #roundRecapPanel.alert .round-recap__summary{color:#ffd7dc}
-  .round-recap__header{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:16px 18px;background:linear-gradient(135deg,#1f2a44 0%,#122035 65%,#101829 100%);color:#e2e8f0}
-  .round-recap__title{margin:0;font-size:16px;font-weight:700;letter-spacing:.01em}
-  .round-recap__subtitle{margin-top:4px;font-size:13px;color:#cbd5f5;opacity:.9}
-  .round-recap__body{padding:16px 18px;display:grid;gap:14px}
-  .round-recap__summary{font-size:14px;line-height:1.5;color:#cbd5f5}
-  .round-recap__stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
-  .round-recap__stat{background:#121722;border:1px solid #1f2632;border-radius:16px;padding:12px 14px;min-height:84px;display:flex;flex-direction:column;justify-content:space-between}
-  .round-recap__label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8fa0ba}
-  .round-recap__value{font-size:18px;font-weight:700;color:#f8fafc;margin-top:6px;word-break:break-word}
-  .round-recap__note{font-size:12px;color:#94a3b8;margin-top:4px}
-  .round-recap__footer{padding:0 18px 18px;display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px}
-  .round-recap__footer-note{color:#94a3b8;font-size:12px;margin-right:auto;min-height:18px}
-  .round-recap__dismiss{padding:6px 14px;border-radius:999px;border:1px solid #2a3444;background:rgba(15,23,42,.65);color:#cbd5f5;font-size:12px;cursor:pointer;transition:background .2s ease,border-color .2s ease}
-  .round-recap__dismiss:hover{background:rgba(15,23,42,.85);border-color:#334155}
+  #roundRecapPanel{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:28px 18px;z-index:220;pointer-events:none;visibility:hidden;opacity:0;transition:opacity .32s ease,visibility .32s ease;background:radial-gradient(120% 120% at 50% 10%,rgba(64,144,255,.35) 0%,rgba(12,26,54,.78) 45%,rgba(6,12,24,.92) 100%);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);overflow:hidden}
+  #roundRecapPanel::before{content:"";position:absolute;inset:0;background:radial-gradient(140% 140% at 50% 0%,rgba(0,140,255,.22) 0%,rgba(3,9,20,.85) 60%,rgba(3,8,18,.96) 100%);mix-blend-mode:screen;opacity:.65;pointer-events:none;z-index:0}
+  #roundRecapPanel.show{visibility:visible;pointer-events:auto;opacity:1}
+  #roundRecapPanel.closing{pointer-events:none;opacity:0}
+  #roundRecapPanel .round-recap{position:relative;z-index:1;max-width:560px;width:min(100%,560px);background:linear-gradient(160deg,rgba(8,18,36,.94) 0%,rgba(6,14,30,.92) 55%,rgba(4,10,22,.96) 100%);border-radius:28px;border:1px solid rgba(74,202,255,.45);box-shadow:0 42px 120px rgba(6,18,40,.85),0 0 32px rgba(30,200,255,.4);overflow:hidden;transform:translate3d(0,32px,0) scale(.97);opacity:0;transition:transform .34s cubic-bezier(.22,1,.36,1),opacity .28s ease;pointer-events:auto;color:#e8f6ff}
+  #roundRecapPanel .round-recap::before{content:"";position:absolute;inset:1px;border-radius:26px;border:1px solid rgba(94,247,255,.22);mix-blend-mode:screen;pointer-events:none}
+  #roundRecapPanel .round-recap::after{content:"";position:absolute;inset:-20% -25% auto -25%;height:280px;background:radial-gradient(60% 60% at 50% 20%,rgba(66,225,255,.32) 0%,rgba(28,130,255,.12) 48%,transparent 70%);opacity:.8;pointer-events:none;transform:translateY(-16px)}
+  #roundRecapPanel.show .round-recap{transform:translate3d(0,0,0) scale(1);opacity:1}
+  #roundRecapPanel.closing .round-recap{transform:translate3d(0,32px,0) scale(.96);opacity:0}
+  #roundRecapPanel.alert .round-recap{border-color:rgba(255,140,76,.6);box-shadow:0 42px 120px rgba(20,6,2,.8),0 0 32px rgba(255,128,72,.42)}
+  #roundRecapPanel.alert .round-recap::before{border-color:rgba(255,189,143,.35)}
+  #roundRecapPanel.alert .round-recap__eyebrow{color:#ffb38a;text-shadow:0 0 16px rgba(255,136,68,.55)}
+  #roundRecapPanel.alert .round-recap__summary{color:#ffe8dd}
+  .round-recap__header{position:relative;padding:28px 32px 22px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;background:linear-gradient(150deg,rgba(10,46,77,.92) 0%,rgba(7,22,42,.94) 55%,rgba(5,16,32,.98) 100%);box-shadow:inset 0 -1px 0 rgba(73,194,255,.35)}
+  .round-recap__header::after{content:"";position:absolute;inset:auto 32px 12px 32px;height:1px;background:linear-gradient(90deg,rgba(73,194,255,.25) 0%,rgba(255,141,70,.4) 52%,rgba(73,194,255,.25) 100%);opacity:.7}
+  .round-recap__header-text{display:grid;gap:10px}
+  .round-recap__eyebrow{font-size:12px;letter-spacing:.46em;text-transform:uppercase;color:#5ef8ff;text-shadow:0 0 16px rgba(80,230,255,.45);font-weight:800}
+  .round-recap__title{margin:0;font-size:clamp(26px,6vw,36px);font-weight:900;letter-spacing:.04em;text-transform:uppercase;color:#f8fbff;text-shadow:0 14px 38px rgba(4,12,26,.75)}
+  .round-recap__subtitle{margin:0;font-size:15px;color:#9ddcff;text-shadow:0 0 20px rgba(104,206,255,.4)}
+  .round-recap__subtitle:empty{display:none}
+  .round-recap__subtitle strong{color:#fef2c0}
+  .round-recap__close{margin:2px 0 0 auto;width:40px;height:40px;border-radius:14px;border:1px solid rgba(94,247,255,.28);background:linear-gradient(140deg,rgba(6,24,44,.9) 0%,rgba(12,48,84,.65) 80%);color:#87eaff;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease,color .18s ease}
+  .round-recap__close:hover,.round-recap__close:focus-visible{transform:translateY(-1px);box-shadow:0 0 18px rgba(94,247,255,.45);border-color:rgba(134,232,255,.65);color:#c8f6ff;outline:none}
+  .round-recap__body{padding:24px 32px 18px;display:grid;gap:20px;position:relative}
+  .round-recap__body::before{content:"";position:absolute;inset:auto 20% 0 20%;height:1px;background:linear-gradient(90deg,rgba(73,194,255,.18) 0%,rgba(255,141,70,.4) 50%,rgba(73,194,255,.18) 100%);opacity:.6;pointer-events:none}
+  .round-recap__summary{font-size:18px;line-height:1.55;font-weight:600;color:#d8f3ff;text-shadow:0 0 22px rgba(76,220,255,.35)}
+  .round-recap__stats{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+  .round-recap__stat{position:relative;padding:16px 18px;border-radius:18px;background:linear-gradient(155deg,rgba(10,32,56,.88) 0%,rgba(5,15,32,.92) 100%);border:1px solid rgba(73,194,255,.35);box-shadow:0 0 0 1px rgba(36,110,168,.35) inset,0 20px 40px rgba(3,12,26,.65);overflow:hidden}
+  .round-recap__stat::before{content:"";position:absolute;inset:-25% -35% 50% -35%;background:radial-gradient(60% 60% at 50% 30%,rgba(80,236,255,.22) 0%,transparent 70%);opacity:.7;pointer-events:none}
+  .round-recap__label{font-size:11px;letter-spacing:.36em;text-transform:uppercase;color:#76c5ff;margin-bottom:8px;display:block}
+  .round-recap__value{font-size:22px;font-weight:800;color:#f9fcff;text-transform:uppercase;letter-spacing:.06em;text-shadow:0 12px 28px rgba(2,8,18,.75)}
+  .round-recap__note{font-size:13px;color:#9cc4ff;margin-top:8px}
+  .round-recap__footer{padding:0 32px 28px;display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:14px}
+  .round-recap__footer-note{color:#94c2ff;font-size:13px;text-transform:uppercase;letter-spacing:.24em;margin-right:auto;min-height:20px}
+  .round-recap__dismiss{padding:12px 22px;border-radius:999px;border:1px solid rgba(255,140,76,.55);background:linear-gradient(135deg,rgba(255,120,54,.95) 0%,rgba(255,162,102,.85) 45%,rgba(255,205,150,.75) 100%);color:#1b0c06;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.22em;cursor:pointer;transition:transform .18s ease,box-shadow .2s ease,filter .2s ease}
+  .round-recap__dismiss:hover,.round-recap__dismiss:focus-visible{transform:translateY(-1px);box-shadow:0 12px 24px rgba(255,136,68,.45);filter:saturate(1.2);outline:none}
+  .round-recap__dismiss:active{transform:translateY(1px)}
   @media (max-width:520px){
-    .round-recap__body{padding:14px 16px}
-    .round-recap__footer{padding:0 16px 16px}
+    #roundRecapPanel{padding:18px}
+    .round-recap__header{padding:24px 22px 18px}
+    .round-recap__header::after{inset:auto 22px 10px 22px}
+    .round-recap__body{padding:20px 22px 16px}
+    .round-recap__body::before{inset:auto 15% 0 15%}
     .round-recap__stats{grid-template-columns:1fr 1fr}
+    .round-recap__footer{padding:0 22px 24px}
   }
   @media (max-width:420px){
     .round-recap__stats{grid-template-columns:1fr}
@@ -326,12 +345,14 @@
   </div>
 
   <div id="roundRecapPanel" aria-live="polite" aria-atomic="false">
-    <div class="round-recap" role="region" aria-labelledby="roundRecapTitle">
+    <div class="round-recap" role="dialog" aria-modal="true" aria-labelledby="roundRecapLabel roundRecapTitle" aria-describedby="roundRecapSummary">
       <div class="round-recap__header">
-        <div>
+        <div class="round-recap__header-text">
+          <div id="roundRecapLabel" class="round-recap__eyebrow">Round Winner</div>
           <div id="roundRecapTitle" class="round-recap__title">Round recap</div>
-          <div id="roundRecapSubtitle" class="round-recap__subtitle"></div>
+          <p id="roundRecapSubtitle" class="round-recap__subtitle"></p>
         </div>
+        <button id="roundRecapClose" class="round-recap__close" type="button" aria-label="Dismiss round winner recap"><span aria-hidden="true">×</span></button>
       </div>
       <div id="roundRecapLive" class="round-recap__body" aria-live="polite" aria-atomic="false">
         <div id="roundRecapSummary" class="round-recap__summary"></div>
@@ -360,7 +381,7 @@
       </div>
       <div class="round-recap__footer">
         <span id="roundRecapFooterNote" class="round-recap__footer-note"></span>
-        <button id="roundRecapDismiss" class="round-recap__dismiss" type="button">Close recap</button>
+        <button id="roundRecapDismiss" class="round-recap__dismiss" type="button">Dismiss recap</button>
       </div>
     </div>
   </div>
