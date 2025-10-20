@@ -1076,7 +1076,6 @@
 
   socket.on('game_started', (d={})=>{
     const priorPhase = phase;
-    nextReadyState = { active:false, readyIds:[] };
     setPhaseUI('idle');
     roundActive = false;
     inHold = false;
@@ -1093,8 +1092,12 @@
     if (finalModal){ finalModal.classList.remove('show'); }
     nextReadyCountdownCfg = null;
     stopNextReadyCountdown();
-    if (nextReadyPanel){ nextReadyPanel.style.display='none'; nextReadyPanel.classList.remove('show'); nextReadyPanel.setAttribute('aria-hidden','true'); }
+    if (nextReadyState){
+      nextReadyState = Object.assign({}, nextReadyState);
+      delete nextReadyState.countdown;
+    }
     if (nextReadyCountdownPlayer){ nextReadyCountdownPlayer.style.display='none'; nextReadyCountdownPlayer.textContent=''; }
+    updateNextReadyUI();
     latestLobby.started = true;
     latestLobby.roundActive = false;
     latestLobby.phase = 'idle';
