@@ -88,6 +88,7 @@ const state = {
   participantsThisRound: new Set(),
   sessionCode: '',
   history: [],
+  numberUsage: null,
   ui: { showHostScoreboard:true, showPublicScoreboard:true, theme:'default', spotlight:true },
   hostSocketId: null,
   activeTicker: null,
@@ -104,6 +105,49 @@ function clearNoHoldTimer(){
     clearTimeout(state.noHoldTimer);
     state.noHoldTimer = null;
   }
+}
+
+function emptyNumberUsageSnapshot(){
+  return { numbers: [], round: state.currentRound || 0, updatedAt: now() };
+}
+
+function normalizeNumberUsageEntry(entry){
+  if (!entry || typeof entry !== 'object') return { value: null, used: 0, total: 0 };
+  const value = entry.value != null ? entry.value : (entry.number != null ? entry.number : null);
+  const usedRaw = entry.used != null ? entry.used : (entry.count != null ? entry.count : 0);
+  const totalRaw = entry.total != null ? entry.total : (entry.max != null ? entry.max : 0);
+  const used = Number(usedRaw);
+  const total = Number(totalRaw);
+  const normalized = {
+    value,
+    used: Number.isFinite(used) ? used : 0,
+    total: Number.isFinite(total) ? total : 0,
+  };
+  if (entry.pct != null){
+    const pct = Number(entry.pct);
+    if (Number.isFinite(pct)) normalized.pct = pct;
+  }
+  return normalized;
+}
+
+function cloneNumberUsageSnapshot(source){
+  if (!source || typeof source !== 'object') return emptyNumberUsageSnapshot();
+  const numbers = Array.isArray(source.numbers) ? source.numbers.map(normalizeNumberUsageEntry) : [];
+  const snapshot = {
+    numbers,
+    round: Number.isFinite(source.round) ? Number(source.round) : (state.currentRound || 0),
+    updatedAt: now(),
+  };
+  if (source.version != null) snapshot.version = source.version;
+  return snapshot;
+}
+
+function getNumberUsageSnapshot(){
+  return state.numberUsage ? cloneNumberUsageSnapshot(state.numberUsage) : emptyNumberUsageSnapshot();
+}
+
+function setNumberUsageSnapshot(snapshot){
+  state.numberUsage = cloneNumberUsageSnapshot(snapshot);
 }
 function startNoHoldTimer(){
   clearNoHoldTimer();
@@ -542,6 +586,11 @@ function endRound(reason='ended'){
   if (bonusMeta.active){ resultPayload.bonusValue = bonusMeta.value; }
   resultPayload.reason = reason;
 
+  const usageSnapshot = getNumberUsageSnapshot();
+  usageSnapshot.round = state.currentRound;
+  state.numberUsage = usageSnapshot;
+  resultPayload.numberUsage = cloneNumberUsageSnapshot(usageSnapshot);
+
   io.emit('round_result', resultPayload);
   state.history.push(historyEntry);
   if (state.history.length > 500) state.history.splice(0, state.history.length - 500);
@@ -593,8 +642,10 @@ function startGame(totalRounds, timeBankMinutes){
   cancelNextRoundCountdown();
   state.readyForNextSet = new Set();
   state.nextRound.requirement = 0;
+  setNumberUsageSnapshot({ numbers: [] });
   updateNextRoundReadyState();
   emitHostStatus(); broadcastLobby(); broadcastPublicScoreboard();
+  try{ io.emit('number_usage_snapshot', getNumberUsageSnapshot()); }catch(e){}
 }
 function buildGameStartedPayload(){
   const rules = {
@@ -910,6 +961,7 @@ io.on('connection', (socket) => {
     if (!p.pin){ p.pin = assignPinUnique(); state.pinIndex.set(p.pin, p.id); }
     refreshPlayerSessionToken(p);
     socket.emit('joined', { id: p.id, name: p.name, tokens: p.tokens, pin: p.pin, sessionToken: p.sessionToken, timeBankMinutes: state.settings.timeBankMinutes });
+    socket.emit('number_usage_snapshot', getNumberUsageSnapshot());
     if (state.phase==='arming'){ /* will join next round */ }
     broadcastLobby();
     updateNextRoundReadyState();
@@ -922,6 +974,7 @@ io.on('connection', (socket) => {
     if (targetId === socket.id){
       const p = state.players[targetId];
       socket.emit('reconnect_result', { ok:true, name:p.name, tokens:p.tokens, pin:p.pin });
+      socket.emit('number_usage_snapshot', getNumberUsageSnapshot());
       return;
     }
     const p = state.players[targetId];
@@ -931,6 +984,7 @@ io.on('connection', (socket) => {
     moved.joined = true;
     refreshPlayerSessionToken(moved);
     socket.emit('joined', { id: moved.id, name: moved.name, tokens: moved.tokens, pin: moved.pin, sessionToken: moved.sessionToken, timeBankMinutes: state.settings.timeBankMinutes });
+    socket.emit('number_usage_snapshot', getNumberUsageSnapshot());
     socket.emit('reconnect_result', { ok:true, name:moved.name, tokens:moved.tokens, pin:moved.pin });
     broadcastLobby();
     updateNextRoundReadyState();
@@ -951,6 +1005,7 @@ io.on('connection', (socket) => {
     moved.joined = true;
     refreshPlayerSessionToken(moved);
     socket.emit('joined', { id: moved.id, name: moved.name, tokens: moved.tokens, pin: moved.pin, sessionToken: moved.sessionToken, timeBankMinutes: state.settings.timeBankMinutes });
+    socket.emit('number_usage_snapshot', getNumberUsageSnapshot());
     broadcastLobby();
     updateNextRoundReadyState();
     emitHostStatus(); broadcastPublicScoreboard();
@@ -972,6 +1027,10 @@ io.on('connection', (socket) => {
     state.readyForNextSet.delete(p.id);
     updateNextRoundReadyState();
     emitHostStatus();
+  });
+
+  socket.on('player_request_number_usage', ()=>{
+    socket.emit('number_usage_snapshot', getNumberUsageSnapshot());
   });
 
   socket.on('hold_press', ()=>{

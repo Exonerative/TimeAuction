@@ -73,6 +73,9 @@
   const STORAGE_KEY = 'ta_player_session_v1';
   const BROADCAST_FALLBACK_KEY = '__ta_player_signal';
   const TAB_ID = Math.random().toString(36).slice(2);
+  const NUMBER_USAGE_SYNC_THROTTLE_MS = 1500;
+  let latestNumberUsageSnapshot = null;
+  let lastNumberUsageSyncAt = 0;
   let sessionInfo = loadSession();
   let shouldAutoResume = !!(sessionInfo && !document.hidden);
   let resumeInFlight = false;
@@ -299,6 +302,7 @@
     const delay = Math.max(0, startTs - now()); hbTimer=setTimeout(doBeat, delay);
   }
   socket.on('hb_ramp_changed', cfg=>{ hbCfg = Object.assign(hbCfg, cfg||{}); });
+  socket.on('number_usage_snapshot', (snapshot)=>{ applyNumberUsageSnapshot(snapshot); });
 
 
   function vibrate(ms){ if (navigator.vibrate) navigator.vibrate(ms); }
@@ -517,6 +521,35 @@
         if (timeBankDetailEl){ timeBankDetailEl.style.display = 'none'; }
       }
     }
+  }
+
+  function snapshotClone(obj){
+    if (!obj || typeof obj !== 'object') return obj;
+    try{ return JSON.parse(JSON.stringify(obj)); }
+    catch(e){ return Object.assign({}, obj); }
+  }
+
+  function applyNumberUsageSnapshot(snapshot){
+    if (!snapshot) return;
+    const copy = snapshotClone(snapshot) || { numbers: [] };
+    if (copy && typeof copy.round !== 'number' && latestLobby && typeof latestLobby.currentRound === 'number'){
+      copy.round = latestLobby.currentRound;
+    }
+    latestNumberUsageSnapshot = copy;
+    try{ window.__latestNumberUsageSnapshot = copy; }
+    catch(e){ window.__latestNumberUsageSnapshot = copy; }
+    if (typeof window.updateNumberUsageRow === 'function'){
+      try{ window.updateNumberUsageRow(copy); }
+      catch(e){}
+    }
+  }
+
+  function requestNumberUsageSync(reason){
+    const nowTs = Date.now();
+    if (nowTs - lastNumberUsageSyncAt < NUMBER_USAGE_SYNC_THROTTLE_MS) return;
+    lastNumberUsageSyncAt = nowTs;
+    try{ socket.emit('player_request_number_usage', { reason }); }
+    catch(e){}
   }
 
   function rebuildLobbySnapshot(payload){
@@ -1086,6 +1119,7 @@
     setPhaseUI('idle'); updateHoldVisual(); stopTimer(); cancelHeartbeat();
     updateNextReadyUI();
     updateMatchMeta();
+    requestNumberUsageSync('joined');
   });
   socket.on('reconnect_result', (r)=>{
     if (!r.ok){ setStatus(r.error || 'Reconnect failed.'); alert(r.error || 'Reconnect failed'); return; }
@@ -1124,6 +1158,7 @@
     latestLobby.phase = 'arming';
     latestLobby.roundActive = false;
     updateMatchMeta();
+    requestNumberUsageSync('arming_started');
   });
 
   // Countdown 3,2,1,0 with unified activationTs
@@ -1223,6 +1258,7 @@
     const rulesSummary = (d && d.rulesText) ? String(d.rulesText).replace(/\n/g, ' \u2022 ') : 'Waiting for host…';
     const title = priorPhase === 'ended' ? 'New match ready' : 'Game started';
     announceInline(title, rulesSummary, 4000);
+    requestNumberUsageSync('game_started');
   });
 
   socket.on('round_result', (d={})=>{
@@ -1231,6 +1267,7 @@
     updateHoldVisual();
     if (holdArea){ holdArea.classList.remove('bonus'); }
 
+    if (d && d.numberUsage){ applyNumberUsageSnapshot(d.numberUsage); }
     applyRoundResultSnapshot(d);
     const recapModel = buildRoundRecapModel(d);
     let fallback = recapModel && recapModel.fallback ? recapModel.fallback : 'Round recap unavailable.';
